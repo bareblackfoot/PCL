@@ -166,8 +166,9 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
+    from resnet_pcl import resnet18
     model = pcl.builder.MoCo(
-        models.__dict__[args.arch],
+        resnet18,
         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     print(model)
 
@@ -227,14 +228,15 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir = os.path.join(args.data, 'train')
+    traindir =args.data
+    # traindir = os.path.join(args.data, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     
     if args.aug_plus:
         # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
         augmentation = [
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+            transforms.RandomResizedCrop((64, 252), scale=(0.2, 1.)),
             transforms.RandomApply([
                 transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
             ], p=0.8),
@@ -247,27 +249,28 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
         augmentation = [
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+            transforms.RandomResizedCrop((64, 252), scale=(0.2, 1.)),
             transforms.RandomGrayscale(p=0.2),
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
         ]
-        
+
     # center-crop augmentation 
     eval_augmentation = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
+        transforms.Resize((80, 315)),
+        transforms.CenterCrop((64, 252)),
         transforms.ToTensor(),
         normalize
-        ])    
-       
-    train_dataset = pcl.loader.ImageFolderInstance(
-        traindir,
-        pcl.loader.TwoCropsTransform(transforms.Compose(augmentation)))
-    eval_dataset = pcl.loader.ImageFolderInstance(
-        traindir,
+        ])
+    DATA_DIR = "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
+    train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
+    train_dataset = pcl.loader.HabitatImageDataset(
+        train_data_list,
+        transforms.Compose(augmentation))
+    eval_dataset = pcl.loader.HabitatImageDataset(
+        train_data_list,
         eval_augmentation)
     
     if args.distributed:
@@ -320,7 +323,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args, cluster_result)
 
-        if (epoch+1)%5==0 and (not args.multiprocessing_distributed or (args.multiprocessing_distributed
+        if (epoch+1)%1==0 and (not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0)):
             save_checkpoint({
                 'epoch': epoch + 1,
