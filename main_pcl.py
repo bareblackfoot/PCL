@@ -98,7 +98,7 @@ parser.add_argument('--cos', action='store_true',
 
 parser.add_argument('--num-cluster', default='25000,50000,100000', type=str, 
                     help='number of clusters')
-parser.add_argument('--warmup-epoch', default=20, type=int,
+parser.add_argument('--warmup-epoch', default=1, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
@@ -269,7 +269,7 @@ def main_worker(gpu, ngpus_per_node, args):
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
         transforms.Compose(augmentation))
-    eval_dataset = pcl.loader.HabitatImageDataset(
+    eval_dataset = pcl.loader.HabitatImageEvalDataset(
         train_data_list,
         eval_augmentation)
     

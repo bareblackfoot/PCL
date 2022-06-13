@@ -58,3 +58,20 @@ class HabitatImageDataset(data.Dataset):
         q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         k = torch.cat([k, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         return [q, k], index
+
+class HabitatImageEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None):
+        self.data_list = data_list
+        self.base_transform = base_transform
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        x = plt.imread(self.data_list[index])
+        im = Image.fromarray(np.uint8(x[...,:3] * 255))
+        q = self.base_transform(im)
+        return q, index
