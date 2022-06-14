@@ -40,9 +40,10 @@ class ImageFolderInstance(datasets.ImageFolder):
         return sample, index
 
 class HabitatImageDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
         self.base_transform = base_transform
+        self.noisydepth = noisydepth
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -55,14 +56,16 @@ class HabitatImageDataset(data.Dataset):
         im = Image.fromarray(np.uint8(x[...,:3] * 255))
         q = self.base_transform(im)
         k = self.base_transform(im)
-        q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-        k = torch.cat([k, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+        if self.noisydepth:
+            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            k = torch.cat([k, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         return [q, k], index
 
 class HabitatImageEvalDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
         self.base_transform = base_transform
+        self.noisydepth = noisydepth
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -74,5 +77,6 @@ class HabitatImageEvalDataset(data.Dataset):
         x = plt.imread(self.data_list[index])
         im = Image.fromarray(np.uint8(x[...,:3] * 255))
         q = self.base_transform(im)
-        q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+        if self.noisydepth:
+            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         return q, index

@@ -102,6 +102,12 @@ parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
+parser.add_argument(
+    "--noisydepth",
+    action='store_true',
+    default=False,
+    help="include stop action or not",
+)
 
 def main():
     args = parser.parse_args()
@@ -166,10 +172,15 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    from resnet_pcl import resnet18
-    model = pcl.builder.MoCo(
-        resnet18,
-        args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
+    if args.noisydepth:
+        from resnet_pcl import resnet18
+        model = pcl.builder.MoCo(
+            resnet18,
+            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
+    else:
+        model = pcl.builder.MoCo(
+            models.__dict__[args.arch],
+            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     print(model)
 
     if args.distributed:
@@ -268,10 +279,12 @@ def main_worker(gpu, ngpus_per_node, args):
     train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
-        transforms.Compose(augmentation))
+        transforms.Compose(augmentation),
+        args.noisydepth)
     eval_dataset = pcl.loader.HabitatImageEvalDataset(
         train_data_list,
-        eval_augmentation)
+        eval_augmentation,
+        args.noisydepth)
     
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
