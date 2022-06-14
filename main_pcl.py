@@ -33,7 +33,7 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('data', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet50',
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
@@ -98,7 +98,7 @@ parser.add_argument('--cos', action='store_true',
 
 parser.add_argument('--num-cluster', default='25000,50000,100000', type=str, 
                     help='number of clusters')
-parser.add_argument('--warmup-epoch', default=20, type=int,
+parser.add_argument('--warmup-epoch', default=1, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
