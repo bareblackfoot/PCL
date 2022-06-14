@@ -74,4 +74,5 @@ class HabitatImageEvalDataset(data.Dataset):
         x = plt.imread(self.data_list[index])
         im = Image.fromarray(np.uint8(x[...,:3] * 255))
         q = self.base_transform(im)
+        q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         return q, index
