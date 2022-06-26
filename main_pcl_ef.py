@@ -26,13 +26,16 @@ import torchvision.models as models
 import pcl.loader
 import pcl.builder
 
+from habitat_dataset import HabitatDataset
+from resnet import resnet18, resnet50
+
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('data', metavar='DIR',
-                    help='path to dataset')
+# parser.add_argument('data', metavar='DIR',
+#                     help='path to dataset')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -62,11 +65,11 @@ parser.add_argument('-p', '--print-freq', default=100, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
-parser.add_argument('--world-size', default=-1, type=int,
+parser.add_argument('--world-size', default=1, type=int,
                     help='number of nodes for distributed training')
-parser.add_argument('--rank', default=-1, type=int,
+parser.add_argument('--rank', default=0, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
+parser.add_argument('--dist-url', default='tcp://localhost:10001', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
@@ -74,15 +77,15 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=None, type=int,
                     help='GPU id to use.')
-parser.add_argument('--multiprocessing-distributed', action='store_true',
+parser.add_argument('--multiprocessing-distributed',default=True, action='store_true',
                     help='Use multi-processing distributed training to launch '
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
-parser.add_argument('--low-dim', default=128, type=int,
+parser.add_argument('--low-dim', default=512, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--pcl-r', default=16384, type=int,
+parser.add_argument('--pcl-r', default=1024, type=int,
                     help='queue size; number of negative pairs; needs to be smaller than num_cluster (default: 16384)')
 parser.add_argument('--moco-m', default=0.999, type=float,
                     help='moco momentum of updating key encoder (default: 0.999)')
@@ -96,18 +99,12 @@ parser.add_argument('--aug-plus', action='store_true',
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
-parser.add_argument('--num-cluster', default='25000,50000,100000', type=str, 
+parser.add_argument('--num-cluster', default='2500,5000,10000', type=str, 
                     help='number of clusters')
-parser.add_argument('--warmup-epoch', default=1, type=int,
+parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
-parser.add_argument(
-    "--noisydepth",
-    action='store_true',
-    default=False,
-    help="include stop action or not",
-)
 
 def main():
     args = parser.parse_args()
@@ -172,15 +169,9 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    if args.noisydepth:
-        from resnet_pcl import resnet18
-        model = pcl.builder.MoCo(
-            resnet18,
-            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
-    else:
-        model = pcl.builder.MoCo(
-            models.__dict__[args.arch],
-            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
+    model = pcl.builder.MoCo(
+        eval(args.arch),
+        args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     print(model)
 
     if args.distributed:
@@ -229,7 +220,14 @@ def main_worker(gpu, ngpus_per_node, args):
                 loc = 'cuda:{}'.format(args.gpu)
                 checkpoint = torch.load(args.resume, map_location=loc)
             args.start_epoch = checkpoint['epoch']
-            model.load_state_dict(checkpoint['state_dict'])
+            sd = model.state_dict()
+            for k, v in sd.items():
+                if checkpoint['state_dict'][k].shape == v.shape:
+                    sd[k] = checkpoint['state_dict'][k]
+                    if 'queue_ptr' in k:
+                       sd[k] *= 0
+            model.load_state_dict(sd)
+            #odel.queue_ptr *= 0.
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
@@ -239,14 +237,14 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir =args.data
-    # traindir = os.path.join(args.data, 'train')
+    #traindir = args.data#os.path.join(args.data, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     
     if args.aug_plus:
         # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
         augmentation = [
+            #transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
             transforms.RandomApply([
                 transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
             ], p=0.8),
@@ -259,28 +257,43 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
         augmentation = [
+            #transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
             transforms.RandomGrayscale(p=0.2),
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
         ]
-
+        
     # center-crop augmentation 
     eval_augmentation = transforms.Compose([
+        #transforms.Resize(256),
+        #transforms.CenterCrop(224),
         transforms.ToTensor(),
         normalize
-        ])
-    DATA_DIR = "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
-    train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
-    train_dataset = pcl.loader.HabitatImageDataset(
-        train_data_list,
-        transforms.Compose(augmentation),
-        args.noisydepth)
-    eval_dataset = pcl.loader.HabitatImageEvalDataset(
-        train_data_list,
-        eval_augmentation,
-        args.noisydepth)
+        ])    
+       
+    #train_dataset = pcl.loader.ImageFolderInstance(
+        # traindir,
+        # pcl.loader.TwoCropsTransform(transforms.Compose(augmentation)))
+    #eval_dataset = pcl.loader.ImageFolderInstance(
+        # traindir,
+        # eval_augmentation)
+    import glob
+    import json
+    train_scenes = json.load(open("train_scenes.json",'r'))
+    test_scenes = json.load(open("test_scenes.json",'r'))
+    data_dir = '/disk3/obin/imgobjnav/'
+    scenes = os.listdir(data_dir)
+    train_list = []
+    for scene in train_scenes:
+        train_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+    train_dataset = HabitatDataset(train_list, pcl.loader.TwoCropsTransform(transforms.Compose(augmentation)))
+    test_list = train_list
+    #test_list = []
+    #for scene in test_scenes:
+    #    test_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+    eval_dataset = HabitatDataset(test_list, eval_augmentation)
     
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -332,7 +345,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args, cluster_result)
 
-        if (epoch+1)%1==0 and (not args.multiprocessing_distributed or (args.multiprocessing_distributed
+        if (epoch+1)%5==0 and (not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0)):
             save_checkpoint({
                 'epoch': epoch + 1,
@@ -407,7 +420,7 @@ def compute_features(eval_loader, model, args):
     features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
     for i, (images, index) in enumerate(tqdm(eval_loader)):
         with torch.no_grad():
-            images = images.cuda(non_blocking=True)
+            images = images[0].cuda(non_blocking=True)
             feat = model(images,is_eval=True) 
             features[index] = feat
     dist.barrier()        

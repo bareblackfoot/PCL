@@ -53,7 +53,13 @@ class HabitatImageDataset(data.Dataset):
 
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
-        im = Image.fromarray(np.uint8(x[...,:3] * 255))
+        data_patches = np.stack([x[:, i * 21:(i + 1) * 21] for i in range(12)])
+        index_list = np.arange(0, 12).tolist()
+        random_cut = np.random.randint(12)
+        index_list = index_list[random_cut:] + index_list[:random_cut]
+        permuted_patches = data_patches[index_list]
+        augmented_img = np.concatenate(np.split(permuted_patches, 12, axis=0), 2)[0]
+        im = Image.fromarray(np.uint8(augmented_img[...,:3] * 255))
         q = self.base_transform(im)
         k = self.base_transform(im)
         if self.noisydepth:
