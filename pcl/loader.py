@@ -59,9 +59,10 @@ class HabitatImageDataset(data.Dataset):
         index_list = index_list[random_cut:] + index_list[:random_cut]
         permuted_patches = data_patches[index_list]
         augmented_img = np.concatenate(np.split(permuted_patches, 12, axis=0), 2)[0]
-        im = Image.fromarray(np.uint8(augmented_img[...,:3] * 255))
+        im = Image.fromarray(np.uint8(x[...,:3] * 255))
+        augmented_img = Image.fromarray(np.uint8(augmented_img[...,:3] * 255))
         q = self.base_transform(im)
-        k = self.base_transform(im)
+        k = self.base_transform(augmented_img)
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
             k = torch.cat([k, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
