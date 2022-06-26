@@ -64,13 +64,13 @@ class HabitatImageDataset(data.Dataset):
         x = plt.imread(self.data_list[index])
         # im = Image.fromarray(np.uint8(x[...,:3] * 255))
         x_aug = self.augment(x)
-        q = x_aug[...,:3]
-        k = x[...,:3] #Image.fromarray(np.uint8(x_aug[...,:3] * 255))
+        q = x[...,:3]
+        k = x_aug[...,:3] #Image.fromarray(np.uint8(x_aug[...,:3] * 255))
         # q = self.base_transform(im)
         # k = self.base_transform(augmented_img)
         if self.noisydepth:
-            q = torch.cat([torch.tensor(q).permute(2,0,1), torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
-            k = torch.cat([torch.tensor(k).permute(2,0,1), torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            q = torch.cat([torch.tensor(q).permute(2,0,1), torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            k = torch.cat([torch.tensor(k).permute(2,0,1), torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
         return [q, k], index
 
 class HabitatImageEvalDataset(data.Dataset):
@@ -87,8 +87,10 @@ class HabitatImageEvalDataset(data.Dataset):
 
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
-        im = Image.fromarray(np.uint8(x[...,:3] * 255))
-        q = self.base_transform(im)
+        q = x[...,:3]
+        # im = Image.fromarray(np.uint8(x[...,:3] * 255))
+        # q = self.base_transform(im)
         if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            q = torch.cat([torch.tensor(q).permute(2,0,1), torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            # q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         return q, index
