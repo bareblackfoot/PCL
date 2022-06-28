@@ -248,7 +248,7 @@ class ResNet(nn.Module):
             rois_new[:, 4] = rois[:, 4] * H
         for i in range(len(rois_new)):
             rois_new[i, 0] = i
-        x = roi_align(x, rois_new, (7, 7), 1.0/(2**3), aligned=True).reshape(B, -1)
+        x = roi_align(x, rois_new, (7, 7), 1.0/(2**3), aligned=True)#.reshape(B, -1)
         # x = self.object_compression(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
