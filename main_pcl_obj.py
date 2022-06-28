@@ -9,7 +9,7 @@ import warnings
 from tqdm import tqdm
 import numpy as np
 import faiss
-
+import glob
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -24,7 +24,7 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 import pcl.loader
-import pcl.builder
+import pcl.builder_obj as builder
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -80,8 +80,8 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
-parser.add_argument('--low-dim', default=128, type=int,
-                    help='feature dimension (default: 128)')
+parser.add_argument('--low-dim', default=32, type=int,
+                    help='feature dimension (default: 32)')
 parser.add_argument('--pcl-r', default=16384, type=int,
                     help='queue size; number of negative pairs; needs to be smaller than num_cluster (default: 16384)')
 parser.add_argument('--moco-m', default=0.999, type=float,
@@ -172,15 +172,10 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    if args.noisydepth:
-        from resnet_pcl import resnet18
-        model = pcl.builder.MoCo(
-            resnet18,
-            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
-    else:
-        model = pcl.builder.MoCo(
-            models.__dict__[args.arch],
-            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
+    from resnet_obj_pcl import resnet18
+    model = builder.MoCo(
+        resnet18,
+        args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     print(model)
 
     if args.distributed:
@@ -271,13 +266,18 @@ def main_worker(gpu, ngpus_per_node, args):
         transforms.ToTensor(),
         normalize
         ])
-    DATA_DIR = "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
-    train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
-    train_dataset = pcl.loader.HabitatImageDataset(
+    # DATA_DIR = "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
+    # train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
+    data_dir = '/disk3/nuri/object_pcl_data'
+    scenes_objects = os.listdir(data_dir)
+    train_data_list = []
+    for scenes_object in scenes_objects:
+        train_data_list.extend(glob.glob(f"{data_dir}/{scenes_object}/*.png"))
+    train_dataset = pcl.loader.HabitatObjectDataset(
         train_data_list,
         transforms.Compose(augmentation),
         args.noisydepth)
-    eval_dataset = pcl.loader.HabitatImageEvalDataset(
+    eval_dataset = pcl.loader.HabitatObjectEvalDataset(
         train_data_list,
         eval_augmentation,
         args.noisydepth)
@@ -359,16 +359,18 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
     model.train()
 
     end = time.time()
-    for i, (images, index) in enumerate(train_loader):
+    for i, (images, objects, index) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         if args.gpu is not None:
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
+            objects[0] = objects[0].cuda(args.gpu, non_blocking=True)
+            objects[1] = objects[1].cuda(args.gpu, non_blocking=True)
                 
         # compute output
-        output, target, output_proto, target_proto = model(im_q=images[0], im_k=images[1], cluster_result=cluster_result, index=index)
+        output, target, output_proto, target_proto = model(im_q=images[0], obj_q=objects[0],  im_k=images[1], obj_k=objects[1], cluster_result=cluster_result, index=index)
         
         # InfoNCE loss
         loss = criterion(output, target)  
@@ -406,10 +408,11 @@ def compute_features(eval_loader, model, args):
     print('Computing features...')
     model.eval()
     features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
-    for i, (images, index) in enumerate(tqdm(eval_loader)):
+    for i, (images, objects, index) in enumerate(tqdm(eval_loader)):
         with torch.no_grad():
             images = images.cuda(non_blocking=True)
-            feat = model(images,is_eval=True) 
+            objects = objects.cuda(non_blocking=True)
+            feat = model(images, objects, is_eval=True)
             features[index] = feat
     dist.barrier()        
     dist.all_reduce(features, op=dist.ReduceOp.SUM)     

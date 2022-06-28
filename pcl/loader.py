@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import torch
+import joblib, glob, os
 
 class TwoCropsTransform:
     """Take two random crops of one image as the query and key."""
@@ -62,12 +63,9 @@ class HabitatImageDataset(data.Dataset):
 
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
-        # im = Image.fromarray(np.uint8(x[...,:3] * 255))
         x_aug = self.augment(x)
         q = torch.tensor(x[...,:3]).permute(2,0,1)
-        k = torch.tensor( x_aug[...,:3]).permute(2,0,1)
-        # q = self.base_transform(im)
-        # k = self.base_transform(augmented_img)
+        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
             k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
@@ -88,9 +86,55 @@ class HabitatImageEvalDataset(data.Dataset):
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
         q = torch.tensor(x[...,:3]).permute(2,0,1)
-        # im = Image.fromarray(np.uint8(x[...,:3] * 255))
-        # q = self.base_transform(im)
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-            # q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         return q, index
+
+
+class HabitatObjectDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        x = plt.imread(self.data_list[index])
+        same_obj_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))
+        same_obj_data = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz'))
+        idx = np.random.randint(len(same_obj_images))
+        x_aug = plt.imread(same_obj_images[idx])
+        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+
+        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
+        q_loc = torch.tensor([0] + list(q_loc['bboxes']))
+        k_loc = joblib.load(same_obj_data[idx])
+        k_loc = torch.tensor([0] + list(k_loc['bboxes']))
+        return [q, k], [q_loc, k_loc], index
+
+
+class HabitatObjectEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        x = plt.imread(self.data_list[index])
+        q = torch.tensor(x[...,:3]).permute(2,0,1)
+
+        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
+        q_loc = torch.tensor([0] + list(q_loc['bboxes']))
+        return q, q_loc, index
