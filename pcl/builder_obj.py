@@ -125,7 +125,7 @@ class MoCo(nn.Module):
         """
         
         if is_eval:
-            k = self.encoder_k.embed_object(im_q, obj_q)
+            k = self.encoder_k(im_q, obj_q)
             k = nn.functional.normalize(k, dim=1)            
             return k
         
@@ -136,14 +136,14 @@ class MoCo(nn.Module):
             # shuffle for making use of BN
             im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
-            k = self.encoder_k.embed_object(im_k, obj_k)  # keys: NxC
+            k = self.encoder_k(im_k, obj_k)  # keys: NxC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
         # compute query features
-        q = self.encoder_q.embed_object(im_q, obj_q)  # queries: NxC
+        q = self.encoder_q(im_q, obj_q)  # queries: NxC
         q = nn.functional.normalize(q, dim=1)
         
         # compute logits
