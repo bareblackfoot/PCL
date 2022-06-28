@@ -157,6 +157,12 @@ class ResNet(nn.Module):
         #                                dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(128 * block.expansion, num_classes)
+        self.object_compression = nn.Sequential(
+            nn.Linear(128 * 7 * 7, 32 * 2),
+            nn.ReLU(),
+            nn.Linear(32 * 2, 32),
+            nn.LayerNorm(32),
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -238,10 +244,11 @@ class ResNet(nn.Module):
             rois_new[:, 4] = rois[:, 4] * H
         for i in range(len(rois_new)):
             rois_new[i, 0] = i
-        x = roi_align(x, rois_new, (3, 3), 1.0/(2**3), aligned=True)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
+        x = roi_align(x, rois_new, (7, 7), 1.0/(2**3), aligned=True).reshape(B, -1)
+        x = self.object_compression(x)
+        # x = self.avgpool(x)
+        # x = torch.flatten(x, 1)
+        # x = self.fc(x)
         return x
 
 
