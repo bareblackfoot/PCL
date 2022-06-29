@@ -103,6 +103,14 @@ class HabitatObjectDataset(data.Dataset):
     def __len__(self):
         return len(self.data_list)
 
+    def add_bbox_noise(self, input_object_t, noise_amount=20, input_height=0.5, input_width=0.5):
+        input_object_noised_t = input_object_t.copy()
+        input_object_noised_t[:, 0] = np.maximum(input_object_noised_t[:, 0] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 0)
+        input_object_noised_t[:, 1] = np.maximum(input_object_noised_t[:, 1] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 0)
+        input_object_noised_t[:, 2] = np.minimum(input_object_noised_t[:, 2] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 1)
+        input_object_noised_t[:, 3] = np.minimum(input_object_noised_t[:, 3] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 1)
+        return input_object_noised_t
+
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
         same_obj_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))
@@ -113,9 +121,17 @@ class HabitatObjectDataset(data.Dataset):
         k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
-        q_loc = torch.tensor([0] + list(q_loc['bboxes']))
+        q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
+        input_width = (q_bbox[:, 2] - q_bbox[:, 0])
+        input_height = (q_bbox[:, 3] - q_bbox[:, 1])
+        q_bbox = self.add_bbox_noise(q_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
+        q_loc = torch.tensor([0] + list(q_bbox[0]))
         k_loc = joblib.load(same_obj_data[idx])
-        k_loc = torch.tensor([0] + list(k_loc['bboxes']))
+        k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
+        input_width = (k_bbox[:, 2] - k_bbox[:, 0])
+        input_height = (k_bbox[:, 3] - k_bbox[:, 1])
+        k_bbox = self.add_bbox_noise(k_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
+        k_loc = torch.tensor([0] + list(k_bbox[0]))
         return [q, k], [q_loc, k_loc], index
 
 

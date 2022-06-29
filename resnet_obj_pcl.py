@@ -227,7 +227,6 @@ class ResNet(nn.Module):
 
         return x_, x
 
-
     # def forward(self, x):
     #     return self._forward_impl(x)[1]
 
