@@ -25,6 +25,7 @@ import torchvision.models as models
 
 import pcl.loader
 import pcl.builder
+import glob
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -239,7 +240,7 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir =args.data
+    # traindir =args.data
     # traindir = os.path.join(args.data, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -271,8 +272,13 @@ def main_worker(gpu, ngpus_per_node, args):
         transforms.ToTensor(),
         normalize
         ])
-    DATA_DIR = "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
-    train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
+    # "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
+    data_dir = args.data
+    scenes = os.listdir(data_dir)
+    train_data_list = []
+    for scene in scenes:
+        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+    # train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
         transforms.Compose(augmentation),
