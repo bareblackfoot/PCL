@@ -276,9 +276,11 @@ def main_worker(gpu, ngpus_per_node, args):
     data_dir = args.data
     scenes = os.listdir(data_dir)
     train_data_list = []
-    for scene in scenes:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
-    # train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
+    if "mp3" in args.data:
+        for scene in scenes:
+            train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+    else:
+        train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
         transforms.Compose(augmentation),
