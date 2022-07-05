@@ -102,6 +102,9 @@ parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
+parser.add_argument('--data-dir', default='/disk3/nuri/object_pcl_data', type=str,
+                    help='experiment directory')
+
 parser.add_argument(
     "--noisydepth",
     action='store_true',
@@ -268,7 +271,7 @@ def main_worker(gpu, ngpus_per_node, args):
         ])
     # DATA_DIR = "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
     # train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
-    data_dir = '/disk3/nuri/object_pcl_data'
+    data_dir = args.data_dir #
     scenes_objects = os.listdir(data_dir)
     train_data_list = []
     for scenes_object in scenes_objects:
