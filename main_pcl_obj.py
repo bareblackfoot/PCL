@@ -102,7 +102,7 @@ parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
-parser.add_argument('--data-dir', default='/disk3/nuri/object_pcl_data', type=str,
+parser.add_argument('--data-dir', default='/disk3/nuri/mp3d_object_pcl_data', type=str,
                     help='experiment directory')
 
 parser.add_argument(
