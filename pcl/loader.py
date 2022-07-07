@@ -111,6 +111,21 @@ class HabitatObjectDataset(data.Dataset):
         input_object_noised_t[:, 3] = np.minimum(input_object_noised_t[:, 3] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 1)
         return input_object_noised_t
 
+    def reduce_half(self, input_object_t):
+        random_int = np.random.randint(10)
+        if random_int == 0:
+            random_int = np.random.randint(4)
+            input_object_t = input_object_t.copy()
+            if random_int == 0:
+                input_object_t[:, 3] = (input_object_t[:, 3] - input_object_t[:, 1]) * 0.5 + input_object_t[:, 1]
+            elif random_int == 1:
+                input_object_t[:, 2] = (input_object_t[:, 2] - input_object_t[:, 0]) * 0.5 + input_object_t[:, 0]
+            elif random_int == 2:
+                input_object_t[:, 0] = (input_object_t[:, 2] - input_object_t[:, 0]) * 0.5 + input_object_t[:, 0]
+            elif random_int == 3:
+                input_object_t[:, 1] = (input_object_t[:, 3] - input_object_t[:, 1]) * 0.5 + input_object_t[:, 1]
+        return input_object_t
+
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
         same_obj_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))
@@ -122,14 +137,16 @@ class HabitatObjectDataset(data.Dataset):
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
         q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
-        input_width = (q_bbox[:, 2] - q_bbox[:, 0])
-        input_height = (q_bbox[:, 3] - q_bbox[:, 1])
-        q_bbox = self.add_bbox_noise(q_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
+        # input_width = (q_bbox[:, 2] - q_bbox[:, 0])
+        # input_height = (q_bbox[:, 3] - q_bbox[:, 1])
+        # q_bbox = self.add_bbox_noise(q_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
         q_loc = torch.tensor([0] + list(q_bbox[0]))
         k_loc = joblib.load(same_obj_data[idx])
         k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
+        k_bbox = self.reduce_half(k_bbox)
         input_width = (k_bbox[:, 2] - k_bbox[:, 0])
         input_height = (k_bbox[:, 3] - k_bbox[:, 1])
+
         k_bbox = self.add_bbox_noise(k_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
         k_loc = torch.tensor([0] + list(k_bbox[0]))
         return [q, k], [q_loc, k_loc], index
