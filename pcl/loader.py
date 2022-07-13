@@ -40,6 +40,7 @@ class ImageFolderInstance(datasets.ImageFolder):
             sample = self.transform(sample)           
         return sample, index
 
+
 class HabitatVideoDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False, temporal_transform=None):
         self.data_list = data_list
@@ -60,7 +61,7 @@ class HabitatVideoDataset(data.Dataset):
         if self.temporal_transform is not None:
             frame_indices = self.temporal_transform(frame_indices)
         imgs = sorted(imgs)
-        imgs = [img for idx, img in enumerate(imgs) if idx in frame_indices]
+        imgs = [imgs[idx] for idx in frame_indices]
         x = []
         for img_path in imgs:
             img = plt.imread(os.path.join(self.data_list[index], img_path))
@@ -90,7 +91,8 @@ class HabitatVideoEvalDataset(data.Dataset):
         if self.temporal_transform is not None:
             frame_indices = self.temporal_transform(frame_indices)
         imgs = sorted(imgs)
-        imgs = [img for idx, img in enumerate(imgs) if idx in frame_indices]
+        imgs = [imgs[idx] for idx in frame_indices]
+        # imgs = [img for idx, img in enumerate(imgs) if idx in frame_indices]
         x = []
         for img_path in imgs:
             img = plt.imread(os.path.join(self.data_list[index], img_path))
