@@ -3,6 +3,7 @@ import torch.nn as nn
 from random import sample
 from torchvision.models import resnet18 as resnet18_rgb
 import torch.nn.functional as F
+import joblib
 
 class MoCo(nn.Module):
     """
@@ -25,8 +26,8 @@ class MoCo(nn.Module):
 
         # create the encoders
         # num_classes is the output fc dimension
-        self.encoder_q = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=252)
-        self.encoder_k = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=252)
+        self.encoder_q = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=(64, 252))
+        self.encoder_k = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=(64, 252))
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
@@ -41,7 +42,7 @@ class MoCo(nn.Module):
         self.register_buffer("queue", torch.randn(dim, r))
         self.queue = nn.functional.normalize(self.queue, dim=0)
         self.project_dir = "/home/blackfoot/codes/Object-Graph-Memory-FinetuneObj"
-        self.visual_encoder = self.load_visual_encoder(512)
+        # self.visual_encoder = self.load_visual_encoder(512)
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
     def load_visual_encoder(self, feature_dim):
@@ -181,6 +182,7 @@ class MoCo(nn.Module):
         if cluster_result is not None:  
             proto_labels = []
             proto_logits = []
+            joblib.dump(cluster_result, os.path.join('/home/blackfoot/codes/PCLD/cluster_result.dat.gz'))
             for n, (im2cluster,prototypes,density) in enumerate(zip(cluster_result['im2cluster'],cluster_result['centroids'],cluster_result['density'])):
                 # get positive prototypes
                 pos_proto_id = im2cluster[index]

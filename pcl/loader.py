@@ -56,8 +56,6 @@ class HabitatVideoDataset(data.Dataset):
     def pull_image(self, index):
         imgs = os.listdir(self.data_list[index])
         imgs = [img for img in imgs if ".jpg" in img]
-        if len(imgs) == 0:
-            os.rmdir(self.data_list[index])
         frame_indices = list(np.arange(len(imgs)))
         if self.temporal_transform is not None:
             frame_indices = self.temporal_transform(frame_indices)
@@ -68,7 +66,7 @@ class HabitatVideoDataset(data.Dataset):
             img = plt.imread(os.path.join(self.data_list[index], img_path))
             x.append(img)
         x = np.stack(x)
-        q = torch.tensor(x).permute(3,0,1,2)
+        q = torch.tensor(x).permute(3,0,1,2).float()
         return [q, q], index
 
 
@@ -88,12 +86,17 @@ class HabitatVideoEvalDataset(data.Dataset):
     def pull_image(self, index):
         imgs = os.listdir(self.data_list[index])
         imgs = [img for img in imgs if ".jpg" in img]
+        frame_indices = list(np.arange(len(imgs)))
+        if self.temporal_transform is not None:
+            frame_indices = self.temporal_transform(frame_indices)
+        imgs = sorted(imgs)
+        imgs = [img for idx, img in enumerate(imgs) if idx in frame_indices]
         x = []
         for img_path in imgs:
             img = plt.imread(os.path.join(self.data_list[index], img_path))
             x.append(img)
         x = np.stack(x)
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        q = torch.tensor(x).permute(3,0,1,2).float()
         return q, index
 
 
