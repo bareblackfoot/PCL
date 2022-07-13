@@ -58,14 +58,14 @@ class HabitatVideoDataset(data.Dataset):
     def pull_image(self, index):
         imgs = os.listdir(self.data_list[index])
         imgs = [img for img in imgs if ".jpg" in img]
+        imgs = sorted(imgs)
         frame_indices = list(np.arange(len(imgs)))
         if self.temporal_transform is not None:
             frame_indices = self.temporal_transform(frame_indices)
         frame_indices_ = frame_indices[-self.sample_duration:]
-        imgs = sorted(imgs)
-        imgs = [imgs[idx] for idx in frame_indices_]
+        imgs_ = [imgs[idx] for idx in frame_indices_]
         x = []
-        for img_path in imgs:
+        for img_path in imgs_:
             img = plt.imread(os.path.join(self.data_list[index], img_path))
             x.append(img)
         x = np.stack(x)
@@ -73,10 +73,9 @@ class HabitatVideoDataset(data.Dataset):
 
         ss = np.random.randint(10)
         frame_indices_ = frame_indices[ss:self.sample_duration+ss]
-        imgs = sorted(imgs)
-        imgs = [imgs[idx] for idx in frame_indices_]
+        imgs_ = [imgs[idx] for idx in frame_indices_]
         x = []
-        for img_path in imgs:
+        for img_path in imgs_:
             img = plt.imread(os.path.join(self.data_list[index], img_path))
             x.append(img)
         x = np.stack(x)
