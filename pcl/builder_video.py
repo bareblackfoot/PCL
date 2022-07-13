@@ -182,7 +182,7 @@ class MoCo(nn.Module):
         if cluster_result is not None:  
             proto_labels = []
             proto_logits = []
-            joblib.dump(cluster_result, os.path.join('/home/blackfoot/codes/PCLD/cluster_result.dat.gz'))
+            # joblib.dump(cluster_result, os.path.join('/home/blackfoot/codes/PCLD/cluster_result.dat.gz'))
             for n, (im2cluster,prototypes,density) in enumerate(zip(cluster_result['im2cluster'],cluster_result['centroids'],cluster_result['density'])):
                 # get positive prototypes
                 pos_proto_id = im2cluster[index]

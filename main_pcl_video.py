@@ -83,7 +83,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 
 parser.add_argument('--low-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--pcl-r', default=16384, type=int,
+parser.add_argument('--pcl-r', default=128, type=int,
                     help='queue size; number of negative pairs; needs to be smaller than num_cluster (default: 16384)')
 parser.add_argument('--moco-m', default=0.999, type=float,
                     help='moco momentum of updating key encoder (default: 0.999)')
@@ -299,7 +299,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train_data_list,
         transforms.Compose(augmentation),
         args.noisydepth,
-        TemporalEndCrop(args.sample_duration)
+        TemporalEndCrop(args.sample_duration + 10)
     )
     eval_dataset = pcl.loader.HabitatVideoEvalDataset(
         train_data_list,
@@ -343,7 +343,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 features = features.numpy()
                 cluster_result = run_kmeans(features,args)  #run kmeans clustering on master node
                 # save the clustering result
-                # torch.save(cluster_result,os.path.join(args.exp_dir, 'clusters_%d'%epoch))  
+                torch.save(cluster_result,os.path.join(args.exp_dir, 'clusters_%d'%epoch))
                 
             dist.barrier()  
             # broadcast clustering result
