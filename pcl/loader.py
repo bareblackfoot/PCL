@@ -40,6 +40,63 @@ class ImageFolderInstance(datasets.ImageFolder):
             sample = self.transform(sample)           
         return sample, index
 
+class HabitatVideoDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False, temporal_transform=None):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+        self.temporal_transform = temporal_transform
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        imgs = os.listdir(self.data_list[index])
+        imgs = [img for img in imgs if ".jpg" in img]
+        if len(imgs) == 0:
+            os.rmdir(self.data_list[index])
+        frame_indices = list(np.arange(len(imgs)))
+        if self.temporal_transform is not None:
+            frame_indices = self.temporal_transform(frame_indices)
+        imgs = sorted(imgs)
+        imgs = [img for idx, img in enumerate(imgs) if idx in frame_indices]
+        x = []
+        for img_path in imgs:
+            img = plt.imread(os.path.join(self.data_list[index], img_path))
+            x.append(img)
+        x = np.stack(x)
+        q = torch.tensor(x).permute(0,3,1,2)
+        return [q, q], index
+
+
+class HabitatVideoEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False, temporal_transform=None):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+        self.temporal_transform = temporal_transform
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        imgs = os.listdir(self.data_list[index])
+        imgs = [img for img in imgs if ".jpg" in img]
+        x = []
+        for img_path in imgs:
+            img = plt.imread(os.path.join(self.data_list[index], img_path))
+            x.append(img)
+        x = np.stack(x)
+        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        return q, index
+
+
 class HabitatImageDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
@@ -136,6 +193,7 @@ class HabitatObjectDataset(data.Dataset):
         k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
+
         q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
         # input_width = (q_bbox[:, 2] - q_bbox[:, 0])
         # input_height = (q_bbox[:, 3] - q_bbox[:, 1])

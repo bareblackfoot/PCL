@@ -1,16 +1,13 @@
-import torch, os
+import torch
 import torch.nn as nn
 from random import sample
-from torchvision.models import resnet18 as resnet18_rgb
-import torch.nn as nn
-import torch.nn.functional as F
 
 class MoCo(nn.Module):
     """
     Build a MoCo model with: a query encoder, a key encoder, and a queue
     https://arxiv.org/abs/1911.05722
     """
-    def __init__(self, base_encoder, dim=128, r=16384, m=0.999, T=0.1, mlp=False):
+    def __init__(self, base_encoder, dim=128, r=16384, m=0.999, T=0.1, mlp=False, sample_duration=16):
         """
         dim: feature dimension (default: 128)
         r: queue size; number of negative samples/prototypes (default: 16384)
@@ -26,8 +23,18 @@ class MoCo(nn.Module):
 
         # create the encoders
         # num_classes is the output fc dimension
-        self.encoder_q = base_encoder(num_classes=dim)
-        self.encoder_k = base_encoder(num_classes=dim)
+        self.encoder_q = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=252)
+        self.encoder_k = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=252)
+        # self.encoder_q = resnet3d.resnet18(
+        #     num_classes=128,
+        #     shortcut_type="B",
+        #     sample_size=252,
+        #     sample_duration=30)
+        # self.encoder_k = resnet3d.resnet18(
+        #     num_classes=128,
+        #     shortcut_type="B",
+        #     sample_size=252,
+        #     sample_duration=30)
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
@@ -41,7 +48,6 @@ class MoCo(nn.Module):
         # create the queue
         self.register_buffer("queue", torch.randn(dim, r))
         self.queue = nn.functional.normalize(self.queue, dim=0)
-        self.visual_encoder = self.load_visual_encoder(512)
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
@@ -116,16 +122,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def load_visual_encoder(self, feature_dim):
-        visual_encoder = resnet18_rgb(num_classes=feature_dim)
-        dim_mlp = visual_encoder.fc.weight.shape[1]
-        visual_encoder.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), visual_encoder.fc)
-        ckpt_pth = os.path.join(self.project_dir, 'model/PCL', f'PCL_encoder_nodepth.pth.tar')
-        ckpt = torch.load(ckpt_pth, map_location='cpu')
-        visual_encoder.load_state_dict({k[len('module.encoder_q.'):]: v for k, v in ckpt['state_dict'].items() if 'module.encoder_q.' in k})
-        return visual_encoder.cuda()
-
-    def forward(self, im_q, obj_q, im_k=None, obj_k=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, im_q, im_k=None, is_eval=False, cluster_result=None, index=None):
         """
         Input:
             im_q: a batch of query images
@@ -138,7 +135,7 @@ class MoCo(nn.Module):
         """
         
         if is_eval:
-            k = self.encoder_k(im_q, obj_q)
+            k = self.encoder_k(im_q)  
             k = nn.functional.normalize(k, dim=1)            
             return k
         
@@ -149,14 +146,14 @@ class MoCo(nn.Module):
             # shuffle for making use of BN
             im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
-            k = self.encoder_k(im_k, obj_k)  # keys: NxC
+            k = self.encoder_k(im_k)  # keys: NxC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
         # compute query features
-        q = self.encoder_q(im_q, obj_q)  # queries: NxC
+        q = self.encoder_q(im_q)  # queries: NxC
         q = nn.functional.normalize(q, dim=1)
         
         # compute logits
@@ -225,5 +222,3 @@ def concat_all_gather(tensor):
 
     output = torch.cat(tensors_gather, dim=0)
     return output
-
-
