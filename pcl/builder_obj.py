@@ -1,9 +1,9 @@
 import torch, os
 import torch.nn as nn
 from random import sample
-from torchvision.models import resnet18 as resnet18_rgb
-import torch.nn as nn
-import torch.nn.functional as F
+# from torchvision.models import resnet18 as resnet18_rgb
+# import torch.nn as nn
+# import torch.nn.functional as F
 
 class MoCo(nn.Module):
     """
@@ -41,7 +41,6 @@ class MoCo(nn.Module):
         # create the queue
         self.register_buffer("queue", torch.randn(dim, r))
         self.queue = nn.functional.normalize(self.queue, dim=0)
-        self.visual_encoder = self.load_visual_encoder(512)
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
@@ -115,15 +114,6 @@ class MoCo(nn.Module):
         idx_this = idx_unshuffle.view(num_gpus, -1)[gpu_idx]
 
         return x_gather[idx_this]
-
-    def load_visual_encoder(self, feature_dim):
-        visual_encoder = resnet18_rgb(num_classes=feature_dim)
-        dim_mlp = visual_encoder.fc.weight.shape[1]
-        visual_encoder.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), visual_encoder.fc)
-        ckpt_pth = os.path.join(self.project_dir, 'model/PCL', f'PCL_encoder_nodepth.pth.tar')
-        ckpt = torch.load(ckpt_pth, map_location='cpu')
-        visual_encoder.load_state_dict({k[len('module.encoder_q.'):]: v for k, v in ckpt['state_dict'].items() if 'module.encoder_q.' in k})
-        return visual_encoder.cuda()
 
     def forward(self, im_q, obj_q, im_k=None, obj_k=None, is_eval=False, cluster_result=None, index=None):
         """

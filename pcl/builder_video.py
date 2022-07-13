@@ -1,6 +1,8 @@
-import torch
+import torch, os
 import torch.nn as nn
 from random import sample
+from torchvision.models import resnet18 as resnet18_rgb
+import torch.nn.functional as F
 
 class MoCo(nn.Module):
     """
@@ -25,16 +27,6 @@ class MoCo(nn.Module):
         # num_classes is the output fc dimension
         self.encoder_q = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=252)
         self.encoder_k = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=252)
-        # self.encoder_q = resnet3d.resnet18(
-        #     num_classes=128,
-        #     shortcut_type="B",
-        #     sample_size=252,
-        #     sample_duration=30)
-        # self.encoder_k = resnet3d.resnet18(
-        #     num_classes=128,
-        #     shortcut_type="B",
-        #     sample_size=252,
-        #     sample_duration=30)
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
@@ -48,8 +40,18 @@ class MoCo(nn.Module):
         # create the queue
         self.register_buffer("queue", torch.randn(dim, r))
         self.queue = nn.functional.normalize(self.queue, dim=0)
-
+        self.project_dir = "/home/blackfoot/codes/Object-Graph-Memory-FinetuneObj"
+        self.visual_encoder = self.load_visual_encoder(512)
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
+
+    def load_visual_encoder(self, feature_dim):
+        visual_encoder = resnet18_rgb(num_classes=feature_dim)
+        dim_mlp = visual_encoder.fc.weight.shape[1]
+        visual_encoder.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), visual_encoder.fc)
+        ckpt_pth = os.path.join(self.project_dir, 'model/PCL', f'PCL_encoder_nodepth.pth.tar')
+        ckpt = torch.load(ckpt_pth, map_location='cpu')
+        visual_encoder.load_state_dict({k[len('module.encoder_q.'):]: v for k, v in ckpt['state_dict'].items() if 'module.encoder_q.' in k})
+        return visual_encoder.cuda()
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):

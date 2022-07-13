@@ -68,7 +68,7 @@ class HabitatVideoDataset(data.Dataset):
             img = plt.imread(os.path.join(self.data_list[index], img_path))
             x.append(img)
         x = np.stack(x)
-        q = torch.tensor(x).permute(0,3,1,2)
+        q = torch.tensor(x).permute(3,0,1,2)
         return [q, q], index
 
 
