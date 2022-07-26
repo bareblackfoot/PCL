@@ -83,7 +83,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 
 parser.add_argument('--low-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--pcl-r', default=128, type=int,
+parser.add_argument('--pcl-r', default=1024, type=int,
                     help='queue size; number of negative pairs; needs to be smaller than num_cluster (default: 16384)')
 parser.add_argument('--moco-m', default=0.999, type=float,
                     help='moco momentum of updating key encoder (default: 0.999)')
@@ -97,7 +97,7 @@ parser.add_argument('--aug-plus', action='store_true',
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
-parser.add_argument('--num-cluster', default='256,512,1024', type=str,
+parser.add_argument('--num-cluster', default='2500,5000,10000', type=str,
                     help='number of clusters')
 parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
