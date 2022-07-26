@@ -26,13 +26,15 @@ class MoCo(nn.Module):
 
         # create the encoders
         # num_classes is the output fc dimension
-        self.encoder_q = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=(64, 252))
-        self.encoder_k = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=(64, 252))
+        self.encoder_k = base_encoder(hidden_size=dim)
+        self.encoder_q = base_encoder(hidden_size=dim)
+        # self.encoder_q = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=(64, 252))
+        # self.encoder_k = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=(64, 252))
 
         if mlp:  # hack: brute-force replacement
-            dim_mlp = self.encoder_q.fc.weight.shape[1]
-            self.encoder_q.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_q.fc)
-            self.encoder_k.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_k.fc)
+            dim_mlp = self.encoder_q.encoder.fc.weight.shape[1]
+            self.encoder_k.encoder.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_k.encoder.fc)
+            self.encoder_q.encoder.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_q.encoder.fc)
 
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
@@ -42,17 +44,8 @@ class MoCo(nn.Module):
         self.register_buffer("queue", torch.randn(dim, r))
         self.queue = nn.functional.normalize(self.queue, dim=0)
         self.project_dir = "/home/blackfoot/codes/Object-Graph-Memory-FinetuneObj"
-        # self.visual_encoder = self.load_visual_encoder(512)
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
-    def load_visual_encoder(self, feature_dim):
-        visual_encoder = resnet18_rgb(num_classes=feature_dim)
-        dim_mlp = visual_encoder.fc.weight.shape[1]
-        visual_encoder.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), visual_encoder.fc)
-        ckpt_pth = os.path.join(self.project_dir, 'model/PCL', f'PCL_encoder_nodepth.pth.tar')
-        ckpt = torch.load(ckpt_pth, map_location='cpu')
-        visual_encoder.load_state_dict({k[len('module.encoder_q.'):]: v for k, v in ckpt['state_dict'].items() if 'module.encoder_q.' in k})
-        return visual_encoder.cuda()
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -125,7 +118,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, traj_q, mask_q, traj_k=None, mask_k=None, is_eval=False, cluster_result=None, index=None):
         """
         Input:
             im_q: a batch of query images
@@ -138,7 +131,7 @@ class MoCo(nn.Module):
         """
         
         if is_eval:
-            k = self.encoder_k(im_q)  
+            k = self.encoder_k(traj_q, mask_q)
             k = nn.functional.normalize(k, dim=1)            
             return k
         
@@ -147,16 +140,16 @@ class MoCo(nn.Module):
             self._momentum_update_key_encoder()  # update the key encoder
 
             # shuffle for making use of BN
-            im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
+            traj_k, idx_unshuffle = self._batch_shuffle_ddp(traj_k)
 
-            k = self.encoder_k(im_k)  # keys: NxC
+            k = self.encoder_k(traj_k, mask_k)  # keys: NxC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
         # compute query features
-        q = self.encoder_q(im_q)  # queries: NxC
+        q = self.encoder_q(traj_q, mask_q)
         q = nn.functional.normalize(q, dim=1)
         
         # compute logits

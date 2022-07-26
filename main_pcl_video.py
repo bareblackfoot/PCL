@@ -127,10 +127,33 @@ class TemporalEndCrop(object):
 
     def __call__(self, frame_indices):
         out = frame_indices[-self.size:]
-
+        mask = list(np.zeros(len(out), dtype=np.bool_))
         if len(frame_indices) < self.size:
             out = [frame_indices[0]] * (self.size - len(frame_indices)) + frame_indices
-        return out
+            mask = [1] * (self.size - len(frame_indices)) + mask
+        return out, mask
+
+
+class TemporalRandomCrop(object):
+    """Temporally crop the given frame indices at a encdding.
+
+    If the number of frames is less than the size,
+    loop the indices as many times as necessary to satisfy the size.
+
+    Args:
+        size (int): Desired output size of the crop.
+    """
+
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self, frame_indices):
+        out = sorted(np.random.choice(frame_indices, min(self.size, len(frame_indices)), replace=False))
+        mask = list(np.zeros(len(out), dtype=np.bool_))
+        if len(frame_indices) < self.size:
+            out = [frame_indices[0]] * (self.size - len(frame_indices)) + frame_indices
+            mask = [1] * (self.size - len(frame_indices)) + mask
+        return out, mask
 
 def main():
     args = parser.parse_args()
@@ -195,9 +218,10 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    from resnet3d import resnet18
+    # from resnet3d import resnet18
+    from pcl.rnn import RNNStateEncoder
     model = pcl.builder_video.MoCo(
-        resnet18,
+        RNNStateEncoder,
         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp, args.sample_duration)
     print(model)
 
@@ -295,19 +319,33 @@ def main_worker(gpu, ngpus_per_node, args):
     train_data_list = []
     for scene in scenes:
         train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+    # train_dataset = pcl.loader.HabitatVideoDataset(
+    #     train_data_list,
+    #     transforms.Compose(augmentation),
+    #     args.noisydepth,
+    #     TemporalEndCrop(args.sample_duration + 10)
+    # )
+    # eval_dataset = pcl.loader.HabitatVideoEvalDataset(
+    #     train_data_list,
+    #     eval_augmentation,
+    #     args.noisydepth,
+    #     TemporalEndCrop(args.sample_duration)
+    # )
+    #
     train_dataset = pcl.loader.HabitatVideoDataset(
         train_data_list,
         transforms.Compose(augmentation),
-        args.noisydepth,
-        TemporalEndCrop(args.sample_duration + 10)
+        TemporalEndCrop(args.sample_duration),
+        TemporalRandomCrop(args.sample_duration),
+        args.sample_duration
     )
     eval_dataset = pcl.loader.HabitatVideoEvalDataset(
         train_data_list,
         eval_augmentation,
-        args.noisydepth,
-        TemporalEndCrop(args.sample_duration)
+        TemporalEndCrop(args.sample_duration),
+        args.sample_duration
     )
-    
+
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
@@ -368,7 +406,6 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best=False, filename='{}/checkpoint_{:04d}.pth.tar'.format(args.exp_dir,epoch))
             # save_checkpoint({k[len('module.encoder_k.'):]: v for k, v in ckpt['state_dict'].items() if 'module.encoder_k.' in k}, is_best=False, filename='{}/PCL_{:04d}.pth.tar'.format(args.exp_dir,epoch))
 
-
 def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result=None):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
@@ -385,17 +422,17 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
     model.train()
 
     end = time.time()
-    for i, (images, index) in enumerate(train_loader):
+    for i, (images, masks, index) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         if args.gpu is not None:
-            images[0] = images[0].cuda(args.gpu, non_blocking=True)
-            images[1] = images[1].cuda(args.gpu, non_blocking=True)
-                
-        # compute output
-        output, target, output_proto, target_proto = model(im_q=images[0], im_k=images[1], cluster_result=cluster_result, index=index)
-        
+            images[0] = images[0].cuda(0, non_blocking=True)
+            images[1] = images[1].cuda(0, non_blocking=True)
+            masks[0] = masks[0].cuda(0, non_blocking=True)
+            masks[1] = masks[1].cuda(0, non_blocking=True)
+
+        output, target, output_proto, target_proto = model(traj_q=images[0], traj_k=images[1], mask_q=masks[0], mask_k=masks[1], index=index, cluster_result=cluster_result)
         # InfoNCE loss
         loss = criterion(output, target)  
         
@@ -432,10 +469,10 @@ def compute_features(eval_loader, model, args):
     print('Computing features...')
     model.eval()
     features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
-    for i, (images, index) in enumerate(tqdm(eval_loader)):
+    for i, (images, masks, index) in enumerate(tqdm(eval_loader)):
         with torch.no_grad():
             images = images.cuda(non_blocking=True)
-            feat = model(images,is_eval=True) 
+            feat = model(images, masks, is_eval=True)
             features[index] = feat
     dist.barrier()        
     dist.all_reduce(features, op=dist.ReduceOp.SUM)     

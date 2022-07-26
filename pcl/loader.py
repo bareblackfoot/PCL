@@ -42,10 +42,84 @@ class ImageFolderInstance(datasets.ImageFolder):
 
 
 class HabitatVideoDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None, noisydepth=False, temporal_transform=None, sample_duration=16):
+    def __init__(self, data_list, base_transform=None, temporal_transform_q=None, temporal_transform_k=None, sample_duration=16, maximum_duration=100):
         self.data_list = data_list
         self.base_transform = base_transform
-        self.noisydepth = noisydepth
+        self.temporal_transform_q = temporal_transform_q
+        self.temporal_transform_k = temporal_transform_k
+        self.sample_duration = sample_duration
+        self.maximum_duration = maximum_duration
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        imgs = os.listdir(self.data_list[index])
+        imgs = [img for img in imgs if ".jpg" in img]
+        imgs = sorted(imgs)
+        frame_indices = list(np.arange(len(imgs)))
+        if self.temporal_transform_q is not None:
+            frame_indices, mask_q = self.temporal_transform_q(frame_indices)
+        # frame_indices_ = frame_indices[-self.sample_duration:]
+        imgs_ = [imgs[idx] for idx in frame_indices]
+        x = []
+        for img_path in imgs_:
+            img = plt.imread(os.path.join(self.data_list[index], img_path))
+            img = self.base_transform(Image.fromarray(img))
+            x.append(img)
+        q = torch.stack(x)
+
+        frame_indices = list(np.arange(len(imgs)))
+        if self.temporal_transform_k is not None:
+            frame_indices, mask_k = self.temporal_transform_k(frame_indices)
+        imgs_ = [imgs[idx] for idx in frame_indices]
+        x = []
+        for img_path in imgs_:
+            img = plt.imread(os.path.join(self.data_list[index], img_path))
+            img = self.base_transform(Image.fromarray(img))
+            x.append(img)
+        k = torch.stack(x)
+        mask_q = torch.tensor(mask_q).float()
+        mask_k = torch.tensor(mask_k).float()
+        return [q, k], [mask_q, mask_k], index
+
+    #
+    # def pull_image(self, index):
+    #     imgs = os.listdir(self.data_list[index])
+    #     imgs = [img for img in imgs if ".jpg" in img]
+    #     imgs = sorted(imgs)
+    #     frame_indices = list(np.arange(len(imgs)))
+    #     if self.temporal_transform_q is not None:
+    #         frame_indices = self.temporal_transform_q(frame_indices)
+    #     # frame_indices_ = frame_indices[-self.sample_duration:]
+    #     imgs_ = [imgs[idx] for idx in frame_indices]
+    #     x = []
+    #     for img_path in imgs_:
+    #         img = plt.imread(os.path.join(self.data_list[index], img_path))
+    #         x.append(img)
+    #     x = np.stack(x)
+    #     q = torch.tensor(x).permute(3, 0, 1, 2).float()
+    #
+    #     frame_indices = list(np.arange(len(imgs)))
+    #     if self.temporal_transform_k is not None:
+    #         frame_indices = self.temporal_transform_k(frame_indices)
+    #     imgs_ = [imgs[idx] for idx in frame_indices]
+    #     x = []
+    #     for img_path in imgs_:
+    #         img = plt.imread(os.path.join(self.data_list[index], img_path))
+    #         x.append(img)
+    #     x = np.stack(x)
+    #     k = torch.tensor(x).permute(3, 0, 1, 2).float()
+    #     return [q, k], index
+
+
+class HabitatVideoEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, temporal_transform=None, sample_duration=16):
+        self.data_list = data_list
+        self.base_transform = base_transform
         self.temporal_transform = temporal_transform
         self.sample_duration = sample_duration
 
@@ -61,57 +135,35 @@ class HabitatVideoDataset(data.Dataset):
         imgs = sorted(imgs)
         frame_indices = list(np.arange(len(imgs)))
         if self.temporal_transform is not None:
-            frame_indices = self.temporal_transform(frame_indices)
-        frame_indices_ = frame_indices[-self.sample_duration:]
-        imgs_ = [imgs[idx] for idx in frame_indices_]
+            frame_indices, mask_q = self.temporal_transform(frame_indices)
+        # frame_indices_ = frame_indices[-self.sample_duration:]
+        imgs_ = [imgs[idx] for idx in frame_indices]
         x = []
         for img_path in imgs_:
             img = plt.imread(os.path.join(self.data_list[index], img_path))
+            img = self.base_transform(Image.fromarray(img))
             x.append(img)
-        x = np.stack(x)
-        q = torch.tensor(x).permute(3,0,1,2).float()
+        q = torch.stack(x)
+        mask_q = torch.tensor(mask_q).float()
+        return q, mask_q, index
 
-        ss = np.random.randint(10)
-        frame_indices_ = frame_indices[ss:self.sample_duration+ss]
-        imgs_ = [imgs[idx] for idx in frame_indices_]
-        x = []
-        for img_path in imgs_:
-            img = plt.imread(os.path.join(self.data_list[index], img_path))
-            x.append(img)
-        x = np.stack(x)
-        k = torch.tensor(x).permute(3,0,1,2).float()
-        return [q, k], index
+    # def pull_image(self, index):
+    #     imgs = os.listdir(self.data_list[index])
+    #     imgs = [img for img in imgs if ".jpg" in img]
+    #     imgs = sorted(imgs)
+    #     frame_indices = list(np.arange(len(imgs)))
+    #     if self.temporal_transform is not None:
+    #         frame_indices = self.temporal_transform(frame_indices)
+    #     frame_indices_ = frame_indices[-self.sample_duration:]
+    #     imgs_ = [imgs[idx] for idx in frame_indices_]
+    #     x = []
+    #     for img_path in imgs_:
+    #         img = plt.imread(os.path.join(self.data_list[index], img_path))
+    #         x.append(img)
+    #     x = np.stack(x)
+    #     q = torch.tensor(x).permute(3, 0, 1, 2).float()
+    #     return q, index
 
-
-class HabitatVideoEvalDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None, noisydepth=False, temporal_transform=None):
-        self.data_list = data_list
-        self.base_transform = base_transform
-        self.noisydepth = noisydepth
-        self.temporal_transform = temporal_transform
-
-    def __getitem__(self, index):
-        return self.pull_image(index)
-
-    def __len__(self):
-        return len(self.data_list)
-
-    def pull_image(self, index):
-        imgs = os.listdir(self.data_list[index])
-        imgs = [img for img in imgs if ".jpg" in img]
-        frame_indices = list(np.arange(len(imgs)))
-        if self.temporal_transform is not None:
-            frame_indices = self.temporal_transform(frame_indices)
-        imgs = sorted(imgs)
-        imgs = [imgs[idx] for idx in frame_indices]
-        # imgs = [img for idx, img in enumerate(imgs) if idx in frame_indices]
-        x = []
-        for img_path in imgs:
-            img = plt.imread(os.path.join(self.data_list[index], img_path))
-            x.append(img)
-        x = np.stack(x)
-        q = torch.tensor(x).permute(3,0,1,2).float()
-        return q, index
 
 
 class HabitatImageDataset(data.Dataset):
