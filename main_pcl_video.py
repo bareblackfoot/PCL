@@ -127,10 +127,10 @@ class TemporalEndCrop(object):
 
     def __call__(self, frame_indices):
         out = frame_indices[-self.size:]
-        mask = list(np.zeros(len(out), dtype=np.bool_))
+        mask = list(np.ones(len(out)))
         if len(frame_indices) < self.size:
             out = [frame_indices[0]] * (self.size - len(frame_indices)) + frame_indices
-            mask = [1] * (self.size - len(frame_indices)) + mask
+            mask = [0] * (self.size - len(frame_indices)) + mask
         return out, mask
 
 
@@ -149,10 +149,10 @@ class TemporalRandomCrop(object):
 
     def __call__(self, frame_indices):
         out = sorted(np.random.choice(frame_indices, min(self.size, len(frame_indices)), replace=False))
-        mask = list(np.zeros(len(out), dtype=np.bool_))
+        mask = list(np.ones(len(out)))
         if len(frame_indices) < self.size:
             out = [frame_indices[0]] * (self.size - len(frame_indices)) + frame_indices
-            mask = [1] * (self.size - len(frame_indices)) + mask
+            mask = [0] * (self.size - len(frame_indices)) + mask
         return out, mask
 
 def main():
