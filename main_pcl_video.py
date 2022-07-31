@@ -438,7 +438,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         loss = criterion(output, target)
 
         # Scene loss
-        loss_scene = -0.1 * criterion(feat, scene_idx)
+        loss_scene = -0.001 * criterion(feat, scene_idx)
 
         loss += loss_scene
 
