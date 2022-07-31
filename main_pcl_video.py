@@ -97,7 +97,7 @@ parser.add_argument('--aug-plus', action='store_true',
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
-parser.add_argument('--num-cluster', default='2500,5000,10000', type=str,
+parser.add_argument('--num-cluster', default='64,128,256', type=str,
                     help='number of clusters')
 parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
@@ -422,7 +422,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
     model.train()
 
     end = time.time()
-    for i, (images, masks, index) in enumerate(train_loader):
+    for i, (images, masks, index, scene_idx) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -431,11 +431,17 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             images[1] = images[1].cuda(0, non_blocking=True)
             masks[0] = masks[0].cuda(0, non_blocking=True)
             masks[1] = masks[1].cuda(0, non_blocking=True)
+            scene_idx = scene_idx.cuda(0, non_blocking=True)
 
-        output, target, output_proto, target_proto = model(traj_q=images[0], traj_k=images[1], mask_q=masks[0], mask_k=masks[1], index=index, cluster_result=cluster_result)
+        output, target, feat, output_proto, target_proto = model(traj_q=images[0], traj_k=images[1], mask_q=masks[0], mask_k=masks[1], index=index, scene_idx = scene_idx, cluster_result=cluster_result)
         # InfoNCE loss
-        loss = criterion(output, target)  
-        
+        loss = criterion(output, target)
+
+        # Scene loss
+        loss_scene = criterion(feat, scene_idx)
+
+        loss += loss_scene
+
         # ProtoNCE loss
         if output_proto is not None:
             loss_proto = 0
@@ -469,7 +475,7 @@ def compute_features(eval_loader, model, args):
     print('Computing features...')
     model.eval()
     features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
-    for i, (images, masks, index) in enumerate(tqdm(eval_loader)):
+    for i, (images, masks, index, scene_idx) in enumerate(tqdm(eval_loader)):
         with torch.no_grad():
             images = images.cuda(non_blocking=True)
             feat = model(images, masks, is_eval=True)

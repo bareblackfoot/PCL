@@ -49,6 +49,7 @@ class HabitatVideoDataset(data.Dataset):
         self.temporal_transform_k = temporal_transform_k
         self.sample_duration = sample_duration
         self.maximum_duration = maximum_duration
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-1].split("_")[0] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -58,6 +59,8 @@ class HabitatVideoDataset(data.Dataset):
 
     def pull_image(self, index):
         imgs = os.listdir(self.data_list[index])
+        scene = self.data_list[index].split("/")[-1].split("_")[0]
+        scene_idx = self.scenes.index(scene)
         imgs = [img for img in imgs if ".jpg" in img]
         imgs = sorted(imgs)
         frame_indices = list(np.arange(len(imgs)))
@@ -84,9 +87,9 @@ class HabitatVideoDataset(data.Dataset):
         k = torch.stack(x)
         mask_q = torch.tensor(mask_q).float()
         mask_k = torch.tensor(mask_k).float()
-        return [q, k], [mask_q, mask_k], index
+        return [q, k], [mask_q, mask_k], index, scene_idx
 
-    #
+
     # def pull_image(self, index):
     #     imgs = os.listdir(self.data_list[index])
     #     imgs = [img for img in imgs if ".jpg" in img]
@@ -122,6 +125,7 @@ class HabitatVideoEvalDataset(data.Dataset):
         self.base_transform = base_transform
         self.temporal_transform = temporal_transform
         self.sample_duration = sample_duration
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-1].split("_")[0] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -130,6 +134,8 @@ class HabitatVideoEvalDataset(data.Dataset):
         return len(self.data_list)
 
     def pull_image(self, index):
+        scene = self.data_list[index].split("/")[-1].split("_")[0]
+        scene_idx = self.scenes.index(scene)
         imgs = os.listdir(self.data_list[index])
         imgs = [img for img in imgs if ".jpg" in img]
         imgs = sorted(imgs)
@@ -145,7 +151,7 @@ class HabitatVideoEvalDataset(data.Dataset):
             x.append(img)
         q = torch.stack(x)
         mask_q = torch.tensor(mask_q).float()
-        return q, mask_q, index
+        return q, mask_q, index, scene_idx
 
     # def pull_image(self, index):
     #     imgs = os.listdir(self.data_list[index])

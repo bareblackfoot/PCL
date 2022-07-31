@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from torchvision.models.resnet import resnet18
+# from torchvision.models.resnet import resnet18
+from pcl.resnet import resnet18
 
 
 class RNNStateEncoder(nn.Module):

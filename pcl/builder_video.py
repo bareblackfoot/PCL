@@ -28,6 +28,7 @@ class MoCo(nn.Module):
         # num_classes is the output fc dimension
         self.encoder_k = base_encoder(hidden_size=dim)
         self.encoder_q = base_encoder(hidden_size=dim)
+        self.logit_scene = nn.Linear(dim,25)
         # self.encoder_q = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=(64, 252))
         # self.encoder_k = base_encoder(num_classes=dim, sample_duration=sample_duration, sample_size=(64, 252))
 
@@ -118,7 +119,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, traj_q, mask_q, traj_k=None, mask_k=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, traj_q, mask_q, traj_k=None, mask_k=None, is_eval=False, cluster_result=None, index=None, scene_idx=None):
         """
         Input:
             im_q: a batch of query images
@@ -150,6 +151,7 @@ class MoCo(nn.Module):
 
         # compute query features
         q = self.encoder_q(traj_q, mask_q)
+        logit_scene = self.logit_scene(q)
         q = nn.functional.normalize(q, dim=1)
         
         # compute logits
@@ -201,9 +203,9 @@ class MoCo(nn.Module):
                 
                 proto_labels.append(labels_proto)
                 proto_logits.append(logits_proto)
-            return logits, labels, proto_logits, proto_labels
+            return logits, labels, logit_scene, proto_logits, proto_labels
         else:
-            return logits, labels, None, None
+            return logits, labels, logit_scene, None, None
 
 
 # utils
