@@ -273,15 +273,15 @@ def main_worker(gpu, ngpus_per_node, args):
         normalize
         ])
     # "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
-    data_dir = os.path.join(args.data, "train")
-    scenes = os.listdir(data_dir)
+
     train_data_list = []
     if "mp3" in args.data:
-        for scene in scenes:
-            train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+        data_dir = args.data
     else:
-        for scene in scenes:
-            train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+        data_dir = os.path.join(args.data, "train")
+    scenes = os.listdir(data_dir)
+    for scene in scenes:
+        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
         # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
@@ -385,9 +385,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         loss = criterion(output, target)  
 
         # Scene loss
-        loss_scene = -0.1 * criterion(feat, scene_idx)
+        loss_scene = 0.03 * criterion(feat, scene_idx)
 
-        loss = loss + loss_scene
+        loss -= loss_scene
         # ProtoNCE loss
         if output_proto is not None:
             loss_proto = 0
