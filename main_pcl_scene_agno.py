@@ -387,7 +387,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
 
         # Scene loss
         loss_scene = 0.03 * criterion(feat, scene_idx)
-        print(loss_scene)
 
         loss -= loss_scene
         # ProtoNCE loss
