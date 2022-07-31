@@ -378,6 +378,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
             scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
+            if epoch < args.warmup_epoch:
+                scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
                 
         # compute output
         output, target, feat, output_proto, target_proto = model(im_q=images[0], im_k=images[1], cluster_result=cluster_result, index=index)

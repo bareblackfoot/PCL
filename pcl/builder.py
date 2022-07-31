@@ -25,7 +25,7 @@ class MoCo(nn.Module):
         # num_classes is the output fc dimension
         self.encoder_q = base_encoder(num_classes=dim)
         self.encoder_k = base_encoder(num_classes=dim)
-        self.logit_scene_fc =nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, 25))
+        self.logit_scene_fc = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, 25))
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
