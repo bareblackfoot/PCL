@@ -49,7 +49,7 @@ class HabitatVideoDataset(data.Dataset):
         self.temporal_transform_k = temporal_transform_k
         self.sample_duration = sample_duration
         self.maximum_duration = maximum_duration
-        self.scenes = sorted(np.unique([self.data_list[index].split("/")[-2] for i in range(len(self.data_list))]))
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -125,7 +125,7 @@ class HabitatVideoEvalDataset(data.Dataset):
         self.base_transform = base_transform
         self.temporal_transform = temporal_transform
         self.sample_duration = sample_duration
-        self.scenes = sorted(np.unique([self.data_list[index].split("/")[-2] for i in range(len(self.data_list))]))
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -177,7 +177,7 @@ class HabitatImageDataset(data.Dataset):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
-        self.scenes = sorted(np.unique([self.data_list[index].split("/")[-2] for i in range(len(self.data_list))]))
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -212,7 +212,7 @@ class HabitatImageEvalDataset(data.Dataset):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
-        self.scenes = sorted(np.unique([self.data_list[index].split("/")[-2] for i in range(len(self.data_list))]))
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
