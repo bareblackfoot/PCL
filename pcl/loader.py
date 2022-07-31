@@ -177,6 +177,7 @@ class HabitatImageDataset(data.Dataset):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-1].split("_")[0] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -194,6 +195,8 @@ class HabitatImageDataset(data.Dataset):
         return augmented_img
 
     def pull_image(self, index):
+        scene = self.data_list[index].split("/")[-1].split("_")[0]
+        scene_idx = self.scenes.index(scene)
         x = plt.imread(self.data_list[index])
         x_aug = self.augment(x)
         q = torch.tensor(x[...,:3]).permute(2,0,1)
@@ -201,13 +204,15 @@ class HabitatImageDataset(data.Dataset):
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
             k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
-        return [q, k], index
+        return [q, k], index, scene_idx
+
 
 class HabitatImageEvalDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-1].split("_")[0] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -216,11 +221,13 @@ class HabitatImageEvalDataset(data.Dataset):
         return len(self.data_list)
 
     def pull_image(self, index):
+        scene = self.data_list[index].split("/")[-1].split("_")[0]
+        scene_idx = self.scenes.index(scene)
         x = plt.imread(self.data_list[index])
         q = torch.tensor(x[...,:3]).permute(2,0,1)
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-        return q, index
+        return q, index, scene_idx
 
 
 class HabitatObjectDataset(data.Dataset):

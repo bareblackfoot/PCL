@@ -25,6 +25,7 @@ class MoCo(nn.Module):
         # num_classes is the output fc dimension
         self.encoder_q = base_encoder(num_classes=dim)
         self.encoder_k = base_encoder(num_classes=dim)
+        self.logit_scene = nn.Linear(dim,25)
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
@@ -144,6 +145,7 @@ class MoCo(nn.Module):
 
         # compute query features
         q = self.encoder_q(im_q)  # queries: NxC
+        logit_scene = self.logit_scene(q)
         q = nn.functional.normalize(q, dim=1)
         
         # compute logits
@@ -194,9 +196,9 @@ class MoCo(nn.Module):
                 
                 proto_labels.append(labels_proto)
                 proto_logits.append(logits_proto)
-            return logits, labels, proto_logits, proto_labels
+            return logits, labels, logit_scene, proto_logits, proto_labels
         else:
-            return logits, labels, None, None
+            return logits, labels, logit_scene, None, None
 
 
 # utils
