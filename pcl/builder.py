@@ -145,7 +145,7 @@ class MoCo(nn.Module):
 
         # compute query features
         q = self.encoder_q(im_q)  # queries: NxC
-        logit_scene = self.logit_scene(q)
+        logit_scene = self.logit_scene(nn.ReLU()(q))
         q = nn.functional.normalize(q, dim=1)
         
         # compute logits
