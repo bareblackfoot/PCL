@@ -197,6 +197,13 @@ class HabitatImageDataset(data.Dataset):
     def pull_image(self, index):
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
+        scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == scene]
+        scene_data_list.remove(self.data_list[index])
+        idx = np.random.randint(len(scene_data_list))
+        negative_sample = scene_data_list[idx]
+        n = plt.imread(negative_sample)
+        n = torch.tensor(n[...,:3]).permute(2,0,1)
+
         x = plt.imread(self.data_list[index])
         x_aug = self.augment(x)
         q = torch.tensor(x[...,:3]).permute(2,0,1)
@@ -204,7 +211,7 @@ class HabitatImageDataset(data.Dataset):
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
             k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
-        return [q, k], index, scene_idx
+        return [q, k, n], index, scene_idx
 
 
 class HabitatImageEvalDataset(data.Dataset):

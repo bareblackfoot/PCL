@@ -25,7 +25,7 @@ class MoCo(nn.Module):
         # num_classes is the output fc dimension
         self.encoder_q = base_encoder(num_classes=dim)
         self.encoder_k = base_encoder(num_classes=dim)
-        self.logit_scene_fc = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, 25))
+        # self.logit_scene_fc = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, 25))
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
@@ -113,7 +113,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, im_q, im_k=None, im_n=None, is_eval=False, cluster_result=None, index=None):
         """
         Input:
             im_q: a batch of query images
@@ -143,10 +143,26 @@ class MoCo(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
+        # compute negative features
+        n = self.encoder_q(im_n)  # queries: NxC
+        n = nn.functional.normalize(n, dim=1)
+        l_pos_adv = torch.einsum('nc,nc->n', [n, k]).unsqueeze(-1)
+        # negative logits: Nxr
+        l_neg_adv = torch.einsum('nc,ck->nk', [n, self.queue.clone().detach()])
+
+        # logits: Nx(1+r)
+        logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
+
+        # apply temperature
+        logits_adv /= self.T
+
+        # labels: positive key indicators
+        labels_adv = torch.zeros(logits_adv.shape[0], dtype=torch.long).cuda()
+
         # compute query features
         q = self.encoder_q(im_q)  # queries: NxC
-        logit_scene = None
-        logit_scene = self.logit_scene_fc(q)
+        # logit_scene = None
+        # logit_scene = self.logit_scene_fc(q)
         q = nn.functional.normalize(q, dim=1)
         
         # compute logits
@@ -197,9 +213,9 @@ class MoCo(nn.Module):
                 
                 proto_labels.append(labels_proto)
                 proto_logits.append(logits_proto)
-            return logits, labels, logit_scene, proto_logits, proto_labels
+            return logits, labels, logits_adv, labels_adv, proto_logits, proto_labels
         else:
-            return logits, labels, logit_scene, None, None
+            return logits, labels, logits_adv, labels_adv, None, None
 
 
 # utils
