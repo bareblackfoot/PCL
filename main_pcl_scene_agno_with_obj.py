@@ -103,6 +103,8 @@ parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
+parser.add_argument('--split', default='train', type=str,
+                    help='experiment directory')
 parser.add_argument(
     "--noisydepth",
     action='store_true',
@@ -276,14 +278,20 @@ def main_worker(gpu, ngpus_per_node, args):
     # "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
 
     train_data_list = []
-    if "mp3" in args.data:
-        data_dir = args.data
-    else:
-        data_dir = os.path.join(args.data, "train")
+    # if "mp3" in args.data:
+    #     data_dir = args.data
+    # else:
+    data_dir = os.path.join(args.data, args.split)
     scenes = os.listdir(data_dir)
-    for scene in scenes:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+    # for scene in scenes:
+    #     train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
         # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
+    for scene in scenes:
+        places = glob.glob(os.path.join(data_dir, scene) + "/*")
+        # places_data = {}
+        for place in places:
+            train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
         transforms.Compose(augmentation),

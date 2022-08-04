@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import torch
-import joblib, glob, os
+import joblib, glob, os, cv2
 
 class TwoCropsTransform:
     """Take two random crops of one image as the query and key."""
@@ -177,7 +177,7 @@ class HabitatImageDataset(data.Dataset):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
-        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -185,32 +185,34 @@ class HabitatImageDataset(data.Dataset):
     def __len__(self):
         return len(self.data_list)
 
-    def augment(self, img):
+    def augment(self, img, sem):
         data_patches = np.stack([img[:, i * 21:(i + 1) * 21] for i in range(12)])
+        sem_data_patches = np.stack([sem[:, i * 21:(i + 1) * 21] for i in range(12)])
         index_list = np.arange(0, 12).tolist()
         random_cut = np.random.randint(12)
         index_list = index_list[random_cut:] + index_list[:random_cut]
         permuted_patches = data_patches[index_list]
+        permuted_sem_patches = sem_data_patches[index_list]
         augmented_img = np.concatenate(np.split(permuted_patches, 12, axis=0), 2)[0]
-        return augmented_img
+        augmented_sem = np.concatenate(np.split(permuted_sem_patches, 12, axis=0), 2)[0]
+        return augmented_img, augmented_sem
 
     def pull_image(self, index):
-        scene = self.data_list[index].split("/")[-2]
+        scene = self.data_list[index].split("/")[-3]
         scene_idx = self.scenes.index(scene)
-        scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == scene]
+        scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-3] == scene]
         scene_data_list.remove(self.data_list[index])
         idx = np.random.randint(len(scene_data_list))
         negative_sample = scene_data_list[idx]
         n = plt.imread(negative_sample)
-        n = torch.tensor(n[...,:3]).permute(2,0,1)
+        n_sem = cv2.imread(negative_sample.replace("rgb", "sem"))
+        n = torch.tensor(np.concatenate([n[...,:3], n_sem/40.], -1)).permute(2,0,1)
 
         x = plt.imread(self.data_list[index])
-        x_aug = self.augment(x)
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
-        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
-        if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-            k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))
+        x_aug, x_aug_sem = self.augment(x, x_sem)
+        q = torch.tensor(np.concatenate([x[...,:3], x_sem/40.], -1)).permute(2,0,1)
+        k = torch.tensor(np.concatenate([x_aug[...,:3], x_aug_sem/40.], -1)).permute(2,0,1)
         return [q, k, n], index, scene_idx
 
 
