@@ -230,38 +230,6 @@ class HabitatImageDataset(data.Dataset):
         return [q, k, n], index, scene_idx
 
 
-class HabitatImageEvalDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None, noisydepth=False):
-        self.data_list = data_list
-        self.base_transform = base_transform
-        self.noisydepth = noisydepth
-        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
-
-    def __getitem__(self, index):
-        return self.pull_image(index)
-
-    def __len__(self):
-        return len(self.data_list)
-
-    def pull_image(self, index):
-        scene = self.data_list[index].split("/")[-2]
-        scene_idx = self.scenes.index(scene)
-        x = plt.imread(self.data_list[index])
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
-        semantic_img = Image.new(
-            "P", (x_sem.shape[1], x_sem.shape[0])
-        )
-        semantic_img.putpalette(d3_40_colors_rgb.flatten())
-        semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
-        # q = torch.tensor(x[...,:3]).permute(2,0,1)
-        # if self.noisydepth:
-        #     q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-        return q, index, scene_idx
-
-
-
 class HabitatImageSemDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
@@ -305,6 +273,34 @@ class HabitatImageSemDataset(data.Dataset):
 
 
 class HabitatImageSemEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        scene = self.data_list[index].split("/")[-2]
+        scene_idx = self.scenes.index(scene)
+        x = plt.imread(self.data_list[index])
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        semantic_img = Image.new(
+            "P", (x_sem.shape[1], x_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
+        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
+        return q, index, scene_idx
+
+
+class HabitatImageEvalDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
         self.base_transform = base_transform
