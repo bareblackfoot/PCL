@@ -247,9 +247,17 @@ class HabitatImageEvalDataset(data.Dataset):
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
         x = plt.imread(self.data_list[index])
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
-        if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        semantic_img = Image.new(
+            "P", (x_sem.shape[1], x_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
+        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
+        # q = torch.tensor(x[...,:3]).permute(2,0,1)
+        # if self.noisydepth:
+        #     q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         return q, index, scene_idx
 
 

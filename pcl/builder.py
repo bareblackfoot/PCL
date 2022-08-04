@@ -191,7 +191,7 @@ class MoCo(nn.Module):
             for n, (im2cluster,prototypes,density) in enumerate(zip(cluster_result['im2cluster'],cluster_result['centroids'],cluster_result['density'])):
                 # get positive prototypes
                 pos_proto_id = im2cluster[index]
-                pos_prototypes = prototypes[pos_proto_id]    
+                pos_prototypes = prototypes[pos_proto_id]
                 
                 # sample negative prototypes
                 all_proto_id = [i for i in range(im2cluster.max()+1)]       
