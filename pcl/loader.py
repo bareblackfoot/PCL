@@ -174,7 +174,7 @@ class HabitatVideoEvalDataset(data.Dataset):
 
 
 
-class HabitatImageDataset(data.Dataset):
+class HabitatImageSemDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
         self.base_transform = base_transform
@@ -230,7 +230,7 @@ class HabitatImageDataset(data.Dataset):
         return [q, k, n], index, scene_idx
 
 
-class HabitatImageSemDataset(data.Dataset):
+class HabitatImageDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
         self.base_transform = base_transform
