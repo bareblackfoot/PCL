@@ -291,7 +291,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # places_data = {}
         for place in places:
             train_data_list.extend(glob.glob(place + "/*_rgb.png"))
-
+    # train_data_list =train_data_list[100:]
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
         transforms.Compose(augmentation),

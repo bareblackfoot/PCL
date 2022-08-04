@@ -3,10 +3,12 @@ import random
 import torchvision.datasets as datasets
 import torch.utils.data as data
 import matplotlib.pyplot as plt
-from PIL import Image
 import numpy as np
 import torch
 import joblib, glob, os, cv2
+from habitat_sim.utils.common import d3_40_colors_rgb
+from PIL import Image
+
 
 class TwoCropsTransform:
     """Take two random crops of one image as the query and key."""
@@ -210,6 +212,12 @@ class HabitatImageDataset(data.Dataset):
 
         x = plt.imread(self.data_list[index])
         x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))
+        semantic_img = Image.new(
+            "P", (x_sem.shape[1], x_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
+        semantic_img = semantic_img.convert("RGBA")
         x_aug, x_aug_sem = self.augment(x, x_sem)
         q = torch.tensor(np.concatenate([x[...,:3], x_sem/40.], -1)).permute(2,0,1)
         k = torch.tensor(np.concatenate([x_aug[...,:3], x_aug_sem/40.], -1)).permute(2,0,1)
