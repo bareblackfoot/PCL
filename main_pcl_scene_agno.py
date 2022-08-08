@@ -276,10 +276,10 @@ def main_worker(gpu, ngpus_per_node, args):
     # "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
 
     train_data_list = []
-    if "mp3" in args.data:
-        data_dir = args.data
-    else:
-        data_dir = os.path.join(args.data, "train")
+    # if "mp3" in args.data:
+    #     data_dir = args.data
+    # else:
+    data_dir = os.path.join(args.data, "train")
     scenes = os.listdir(data_dir)
     for scene in scenes:
         train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
