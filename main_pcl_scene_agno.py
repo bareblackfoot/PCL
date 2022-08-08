@@ -279,10 +279,17 @@ def main_worker(gpu, ngpus_per_node, args):
     # if "mp3" in args.data:
     #     data_dir = args.data
     # else:
+
     data_dir = os.path.join(args.data, "train")
     scenes = os.listdir(data_dir)
     for scene in scenes:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+        places = glob.glob(os.path.join(data_dir, scene) + "/*")
+        for place in places:
+            train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+    # data_dir = os.path.join(args.data, "train")
+    # scenes = os.listdir(data_dir)
+    # for scene in scenes:
+    #     train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
         # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
