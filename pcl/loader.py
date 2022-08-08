@@ -174,6 +174,71 @@ class HabitatVideoEvalDataset(data.Dataset):
 
 
 
+class HabitatImageDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def augment(self, img):
+        data_patches = np.stack([img[:, i * 21:(i + 1) * 21] for i in range(12)])
+        index_list = np.arange(0, 12).tolist()
+        random_cut = np.random.randint(12)
+        index_list = index_list[random_cut:] + index_list[:random_cut]
+        permuted_patches = data_patches[index_list]
+        augmented_img = np.concatenate(np.split(permuted_patches, 12, axis=0), 2)[0]
+        return augmented_img
+
+    def pull_image(self, index):
+        scene = self.data_list[index].split("/")[-2]
+        scene_idx = self.scenes.index(scene)
+        scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == scene]
+        scene_data_list.remove(self.data_list[index])
+        idx = np.random.randint(len(scene_data_list))
+        negative_sample = scene_data_list[idx]
+        n = plt.imread(negative_sample)
+        n = torch.tensor(n[...,:3]).permute(2,0,1)
+
+        x = plt.imread(self.data_list[index])
+        x_aug = self.augment(x)
+        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+        if self.noisydepth:
+            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
+        return [q, k, n], index, scene_idx
+
+class HabitatImageEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        scene = self.data_list[index].split("/")[-2]
+        scene_idx = self.scenes.index(scene)
+        x = plt.imread(self.data_list[index])
+        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        if self.noisydepth:
+            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+        return q, index, scene_idx
+
+
+
 class HabitatImageSemDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
@@ -230,48 +295,6 @@ class HabitatImageSemDataset(data.Dataset):
         return [q, k, n], index, scene_idx
 
 
-class HabitatImageDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None, noisydepth=False):
-        self.data_list = data_list
-        self.base_transform = base_transform
-        self.noisydepth = noisydepth
-        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
-
-    def __getitem__(self, index):
-        return self.pull_image(index)
-
-    def __len__(self):
-        return len(self.data_list)
-
-    def augment(self, img):
-        data_patches = np.stack([img[:, i * 21:(i + 1) * 21] for i in range(12)])
-        index_list = np.arange(0, 12).tolist()
-        random_cut = np.random.randint(12)
-        index_list = index_list[random_cut:] + index_list[:random_cut]
-        permuted_patches = data_patches[index_list]
-        augmented_img = np.concatenate(np.split(permuted_patches, 12, axis=0), 2)[0]
-        return augmented_img
-
-    def pull_image(self, index):
-        scene = self.data_list[index].split("/")[-2]
-        scene_idx = self.scenes.index(scene)
-        scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == scene]
-        scene_data_list.remove(self.data_list[index])
-        idx = np.random.randint(len(scene_data_list))
-        negative_sample = scene_data_list[idx]
-        n = plt.imread(negative_sample)
-        n = torch.tensor(n[...,:3]).permute(2,0,1)
-
-        x = plt.imread(self.data_list[index])
-        x_aug = self.augment(x)
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
-        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
-        if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-            k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
-        return [q, k, n], index, scene_idx
-
-
 class HabitatImageSemEvalDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
@@ -300,7 +323,58 @@ class HabitatImageSemEvalDataset(data.Dataset):
         return q, index, scene_idx
 
 
-class HabitatImageEvalDataset(data.Dataset):
+class HabitatSemDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def augment(self, sem):
+        sem_data_patches = np.stack([sem[:, i * 21:(i + 1) * 21] for i in range(12)])
+        index_list = np.arange(0, 12).tolist()
+        random_cut = np.random.randint(12)
+        index_list = index_list[random_cut:] + index_list[:random_cut]
+        permuted_sem_patches = sem_data_patches[index_list]
+        augmented_sem = np.concatenate(np.split(permuted_sem_patches, 12, axis=0), 2)[0]
+        return augmented_sem
+
+    def pull_image(self, index):
+        scene = self.data_list[index].split("/")[-3]
+        scene_idx = self.scenes.index(scene)
+        scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-3] == scene]
+        scene_data_list.remove(self.data_list[index])
+        idx = np.random.randint(len(scene_data_list))
+        negative_sample = scene_data_list[idx]
+        n_sem = cv2.imread(negative_sample.replace("rgb", "sem"))[...,0:1]
+        semantic_img = Image.new(
+            "P", (n_sem.shape[1], n_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((n_sem.flatten() % 40).astype(np.uint8))
+        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        n = torch.tensor(semantic_img).permute(2,0,1).float()
+
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        semantic_img = Image.new(
+            "P", (x_sem.shape[1], x_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
+        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        x_aug_sem = self.augment(semantic_img)
+        q = torch.tensor(semantic_img).permute(2,0,1).float()
+        k = torch.tensor(x_aug_sem).permute(2,0,1).float()
+        return [q, k, n], index, scene_idx
+
+
+class HabitatSemEvalDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
         self.base_transform = base_transform
@@ -316,10 +390,14 @@ class HabitatImageEvalDataset(data.Dataset):
     def pull_image(self, index):
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
-        x = plt.imread(self.data_list[index])
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
-        if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        semantic_img = Image.new(
+            "P", (x_sem.shape[1], x_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
+        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        q = torch.tensor(semantic_img).permute(2,0,1).float()
         return q, index, scene_idx
 
 
