@@ -286,17 +286,19 @@ def main_worker(gpu, ngpus_per_node, args):
     # if "mp3" in args.data:
     #     data_dir = args.data
     # else:
-    for split in ['train', 'val']:
-        data_dir = os.path.join(args.data, split)
-        scenes = os.listdir(data_dir)
-        # for scene in scenes:
-        #     train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
-            # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
-        for scene in scenes:
-            places = glob.glob(os.path.join(data_dir, scene) + "/*")
-            # places_data = {}
-            for place in places:
-                train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+    data_dir = os.path.join(args.data, "train")
+    scenes = os.listdir(data_dir)
+    for scene in scenes:
+        places = glob.glob(os.path.join(data_dir, scene) + "/*")
+        for place in places:
+            train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+    # for split in ['train', 'val']:
+    #     data_dir = os.path.join(args.data, split)
+    #     scenes = os.listdir(data_dir)
+    #     for scene in scenes:
+    #         places = glob.glob(os.path.join(data_dir, scene) + "/*")
+    #         for place in places:
+    #             train_data_list.extend(glob.glob(place + "/*_rgb.png"))
     # train_data_list =train_data_list[100:]
     train_dataset = pcl.loader.HabitatImageSemDataset(
         train_data_list,
@@ -403,7 +405,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         loss = criterion(output, target)  
 
         # Adversarial loss
-        loss_adv = -criterion(output_adv, target_adv)
+        loss_adv = -0.1 * criterion(output_adv, target_adv)
 
         # Scene loss
         # loss_scene = torch.clip(1.0-0.1 * criterion(feat, scene_idx), 0.0)
