@@ -386,11 +386,11 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
             images[2] = images[2].cuda(args.gpu, non_blocking=True)
             scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
-            if epoch < args.warmup_epoch:
-                scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
+            # if epoch < args.warmup_epoch:
+            #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
                 
         # compute output
-        output, target,  output_adv, target_adv, output_proto, target_proto = model(im_q=images[0], im_k=images[1], im_n=images[2], cluster_result=cluster_result, index=index)
+        output, target,  output_adv, target_adv, output_proto, target_proto = model(im_q=images[0], im_k=images[1], im_n=images[2], scene_idx=scene_idx, cluster_result=cluster_result, index=index)
         
         # InfoNCE loss
         loss = criterion(output, target)  

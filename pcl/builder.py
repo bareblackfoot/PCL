@@ -38,6 +38,7 @@ class MoCo(nn.Module):
 
         # create the queue
         self.register_buffer("queue", torch.randn(dim, r))
+        self.register_buffer("queue_l", torch.zeros(r, dtype=torch.long))
         self.queue = nn.functional.normalize(self.queue, dim=0)
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
@@ -51,9 +52,10 @@ class MoCo(nn.Module):
             param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
 
     @torch.no_grad()
-    def _dequeue_and_enqueue(self, keys):
+    def _dequeue_and_enqueue(self, keys, scenes):
         # gather keys before updating queue
         keys = concat_all_gather(keys)
+        scenes = concat_all_gather(scenes)
 
         batch_size = keys.shape[0]
 
@@ -62,6 +64,7 @@ class MoCo(nn.Module):
 
         # replace the keys at ptr (dequeue and enqueue)
         self.queue[:, ptr:ptr + batch_size] = keys.T
+        self.queue_l[:, ptr:ptr + batch_size] = scenes
         ptr = (ptr + batch_size) % self.r  # move pointer
 
         self.queue_ptr[0] = ptr
@@ -113,7 +116,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k=None, im_n=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, im_q, im_k=None, im_n=None, scene_idx=None, is_eval=False, cluster_result=None, index=None):
         """
         Input:
             im_q: a batch of query images
@@ -151,7 +154,7 @@ class MoCo(nn.Module):
         l_neg_adv = torch.einsum('nc,ck->nk', [n, self.queue.clone().detach()])
 
         # logits: Nx(1+r)
-        logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
+        logits_adv = torch.cat([l_pos_adv, l_neg_adv[:3]], dim=1)
 
         # apply temperature
         logits_adv /= self.T
@@ -182,7 +185,7 @@ class MoCo(nn.Module):
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
 
         # dequeue and enqueue
-        self._dequeue_and_enqueue(k)
+        self._dequeue_and_enqueue(k, k_scenes)
         
         # prototypical contrast
         if cluster_result is not None:  
