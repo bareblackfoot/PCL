@@ -177,15 +177,6 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    # if args.noisydepth:
-    #     from resnet_pcl import resnet18
-    #     model = pcl.builder.MoCo(
-    #         resnet18,
-    #         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
-    # else:
-    #     model = pcl.builder.MoCo(
-    #         models.__dict__[args.arch],
-    #         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     model = pcl.builder.MoCo(
         resnet18,
         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
