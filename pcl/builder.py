@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from random import sample
 
 class MoCo(nn.Module):
@@ -52,10 +53,10 @@ class MoCo(nn.Module):
             param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
 
     @torch.no_grad()
-    def _dequeue_and_enqueue(self, keys, scenes):
+    def _dequeue_and_enqueue(self, keys, scene_idxs):
         # gather keys before updating queue
         keys = concat_all_gather(keys)
-        scenes = concat_all_gather(scenes)
+        scene_idxs = concat_all_gather(scene_idxs)
 
         batch_size = keys.shape[0]
 
@@ -64,7 +65,7 @@ class MoCo(nn.Module):
 
         # replace the keys at ptr (dequeue and enqueue)
         self.queue[:, ptr:ptr + batch_size] = keys.T
-        self.queue_l[:, ptr:ptr + batch_size] = scenes
+        self.queue_l[ptr:ptr + batch_size] = scene_idxs
         ptr = (ptr + batch_size) % self.r  # move pointer
 
         self.queue_ptr[0] = ptr
@@ -151,10 +152,18 @@ class MoCo(nn.Module):
         n = nn.functional.normalize(n, dim=1)
         l_pos_adv = torch.einsum('nc,nc->n', [n, k]).unsqueeze(-1)
         # negative logits: Nxr
-        l_neg_adv = torch.einsum('nc,ck->nk', [n, self.queue.clone().detach()])
+        aa = list(self.queue_l.clone().cpu().detach().numpy())
+        neg_idx = list(np.arange(len(aa)))
+        for si in scene_idx:
+            idxs = np.where([j == si.item() for j in np.stack(aa)])[0]
+            for idx in idxs:
+                if idx in neg_idx:
+                    neg_idx.remove(idx)
+        valid_neg_idx = torch.from_numpy(np.stack(neg_idx)).cuda()[:16]
+        l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()[:, valid_neg_idx]])
 
         # logits: Nx(1+r)
-        logits_adv = torch.cat([l_pos_adv, l_neg_adv[:3]], dim=1)
+        logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
 
         # apply temperature
         logits_adv /= self.T
@@ -185,7 +194,7 @@ class MoCo(nn.Module):
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
 
         # dequeue and enqueue
-        self._dequeue_and_enqueue(k, k_scenes)
+        self._dequeue_and_enqueue(k, scene_idx)
         
         # prototypical contrast
         if cluster_result is not None:  
