@@ -155,6 +155,7 @@ class MoCo(nn.Module):
         # aa = list(self.queue_l.clone().cpu().detach().numpy())
         # neg_idx = list(np.arange(len(aa)))
         # for si in scene_idx:
+        #     self.queue.clone().detach()
         #     idxs = np.where([j == si.item() for j in np.stack(aa)])[0]
         #     for idx in idxs:
         #         if idx in neg_idx:
@@ -167,7 +168,7 @@ class MoCo(nn.Module):
         logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
 
         # apply temperature
-        logits_adv /= self.T
+        # logits_adv /=
 
         # labels: positive key indicators
         labels_adv = torch.zeros(logits_adv.shape[0], dtype=torch.long).cuda()
