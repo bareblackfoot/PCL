@@ -390,7 +390,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
                 
         # compute output
-        output, target,  output_adv, target_adv, output_proto, target_proto = model(im_q=images[0], im_k=images[1], im_n=images[2], scene_idx=scene_idx, cluster_result=cluster_result, index=index)
+        output, target, output_adv, target_adv, output_proto, target_proto = model(im_q=images[0], im_k=images[1], im_n=images[2], scene_idx=scene_idx, cluster_result=cluster_result, index=index)
         
         # InfoNCE loss
         loss = criterion(output, target)  
@@ -399,7 +399,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         loss_adv = -0.001 * criterion(output_adv, target_adv)
 
         # Scene loss
-        # loss_scene = torch.clip(1.0-0.1 * criterion(feat, scene_idx), 0.0)
+        # loss_scene = torch.clip(1.0-0.1 * criterion(adv_feat, scene_idx), 0.0)
         loss += loss_adv
 
         # ProtoNCE loss

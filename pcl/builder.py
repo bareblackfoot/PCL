@@ -152,15 +152,16 @@ class MoCo(nn.Module):
         n = nn.functional.normalize(n, dim=1)
         l_pos_adv = torch.einsum('nc,nc->n', [n, k]).unsqueeze(-1)
         # negative logits: Nxr
-        aa = list(self.queue_l.clone().cpu().detach().numpy())
-        neg_idx = list(np.arange(len(aa)))
-        for si in scene_idx:
-            idxs = np.where([j == si.item() for j in np.stack(aa)])[0]
-            for idx in idxs:
-                if idx in neg_idx:
-                    neg_idx.remove(idx)
-        valid_neg_idx = torch.from_numpy(np.stack(neg_idx)).cuda()[:self.r//2]
-        l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()[:, valid_neg_idx]])
+        # aa = list(self.queue_l.clone().cpu().detach().numpy())
+        # neg_idx = list(np.arange(len(aa)))
+        # for si in scene_idx:
+        #     idxs = np.where([j == si.item() for j in np.stack(aa)])[0]
+        #     for idx in idxs:
+        #         if idx in neg_idx:
+        #             neg_idx.remove(idx)
+        # valid_neg_idx = torch.from_numpy(np.stack(neg_idx)).cuda()[:self.r//2]
+        # l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()[:, valid_neg_idx]])
+        l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()[:, :self.r//2]])
 
         # logits: Nx(1+r)
         logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
