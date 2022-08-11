@@ -162,7 +162,7 @@ class MoCo(nn.Module):
         #             neg_idx.remove(idx)
         # valid_neg_idx = torch.from_numpy(np.stack(neg_idx)).cuda()[:self.r//2]
         # l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()[:, valid_neg_idx]])
-        l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()[:, :self.r//2]])
+        l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()])
 
         # logits: Nx(1+r)
         logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
