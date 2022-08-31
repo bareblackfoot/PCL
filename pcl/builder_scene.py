@@ -39,7 +39,7 @@ class MoCo(nn.Module):
 
         # create the queue
         self.register_buffer("queue", torch.randn(dim, r))
-        # self.register_buffer("queue_l", torch.zeros(r, dtype=torch.long))
+        self.register_buffer("queue_l", torch.zeros(r, dtype=torch.long))
         self.queue = nn.functional.normalize(self.queue, dim=0)
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
@@ -53,10 +53,10 @@ class MoCo(nn.Module):
             param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
 
     @torch.no_grad()
-    def _dequeue_and_enqueue(self, keys):
+    def _dequeue_and_enqueue(self, keys, scene_idxs):
         # gather keys before updating queue
         keys = concat_all_gather(keys)
-        # scene_idxs = concat_all_gather(scene_idxs)
+        scene_idxs = concat_all_gather(scene_idxs)
 
         batch_size = keys.shape[0]
 
@@ -65,7 +65,7 @@ class MoCo(nn.Module):
 
         # replace the keys at ptr (dequeue and enqueue)
         self.queue[:, ptr:ptr + batch_size] = keys.T
-        # self.queue_l[ptr:ptr + batch_size] = scene_idxs
+        self.queue_l[ptr:ptr + batch_size] = scene_idxs
         ptr = (ptr + batch_size) % self.r  # move pointer
 
         self.queue_ptr[0] = ptr
@@ -117,7 +117,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, im_q, im_k=None, im_n=None, scene_idx=None, is_eval=False, cluster_result=None, index=None):
         """
         Input:
             im_q: a batch of query images
@@ -148,9 +148,9 @@ class MoCo(nn.Module):
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
         # compute negative features
-        # n = self.encoder_q(im_n)  # queries: NxC
-        # n = nn.functional.normalize(n, dim=1)
-        # l_pos_adv = torch.einsum('nc,nc->n', [n, k]).unsqueeze(-1)
+        n = self.encoder_q(im_n)  # queries: NxC
+        n = nn.functional.normalize(n, dim=1)
+        l_pos_adv = torch.einsum('nc,nc->n', [n, k]).unsqueeze(-1)
         # negative logits: Nxr
         # aa = list(self.queue_l.clone().cpu().detach().numpy())
         # neg_idx = list(np.arange(len(aa)))
@@ -162,16 +162,16 @@ class MoCo(nn.Module):
         #             neg_idx.remove(idx)
         # valid_neg_idx = torch.from_numpy(np.stack(neg_idx)).cuda()[:self.r//2]
         # l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()[:, valid_neg_idx]])
-        # l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()])
+        l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()])
 
         # logits: Nx(1+r)
-        # logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
+        logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
 
         # apply temperature
         # logits_adv /=
 
         # labels: positive key indicators
-        # labels_adv = torch.zeros(logits_adv.shape[0], dtype=torch.long).cuda()
+        labels_adv = torch.zeros(logits_adv.shape[0], dtype=torch.long).cuda()
 
         # compute query features
         q = self.encoder_q(im_q)  # queries: NxC
@@ -196,7 +196,7 @@ class MoCo(nn.Module):
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
 
         # dequeue and enqueue
-        self._dequeue_and_enqueue(k)
+        self._dequeue_and_enqueue(k, scene_idx)
         
         # prototypical contrast
         if cluster_result is not None:  
@@ -227,9 +227,9 @@ class MoCo(nn.Module):
                 
                 proto_labels.append(labels_proto)
                 proto_logits.append(logits_proto)
-            return logits, labels, proto_logits, proto_labels
+            return logits, labels, logits_adv, labels_adv, proto_logits, proto_labels
         else:
-            return logits, labels, None, None
+            return logits, labels, logits_adv, labels_adv, None, None
 
 
 # utils
