@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import joblib, glob, os, cv2
-from habitat_sim.utils.common import d3_40_colors_rgb
 from PIL import Image
 
 
@@ -276,6 +275,7 @@ class HabitatImageSemDataset(data.Dataset):
         semantic_img = Image.new(
             "P", (n_sem.shape[1], n_sem.shape[0])
         )
+        from habitat_sim.utils.common import d3_40_colors_rgb
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((n_sem.flatten() % 40).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
@@ -316,6 +316,7 @@ class HabitatImageSemEvalDataset(data.Dataset):
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
+        from habitat_sim.utils.common import d3_40_colors_rgb
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
@@ -482,3 +483,57 @@ class HabitatObjectEvalDataset(data.Dataset):
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
         q_loc = torch.tensor([0] + list(q_loc['bboxes']))
         return q, q_loc, index
+
+
+
+class AI2thorImageDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def augment(self, img):
+        data_patches = np.stack([img[:, i * 32:(i + 1) * 32] for i in range(8)])
+        index_list = np.arange(0, 8).tolist()
+        random_cut = np.random.randint(8)
+        index_list = index_list[random_cut:] + index_list[:random_cut]
+        permuted_patches = data_patches[index_list]
+        augmented_img = np.concatenate(np.split(permuted_patches, 8, axis=0), 2)[0]
+        return augmented_img
+
+    def pull_image(self, index):
+        x = plt.imread(self.data_list[index])
+        x_aug = self.augment(x)
+        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+        if self.noisydepth:
+            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
+        return [q, k], index
+
+class AI2thorImageEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        # scene = self.data_list[index].split("/")[-2]
+        x = plt.imread(self.data_list[index])
+        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        if self.noisydepth:
+            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+        return q, index
+
