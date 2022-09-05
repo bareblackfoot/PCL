@@ -484,8 +484,6 @@ class HabitatObjectEvalDataset(data.Dataset):
         q_loc = torch.tensor([0] + list(q_loc['bboxes']))
         return q, q_loc, index
 
-
-
 class AI2thorImageDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
@@ -501,7 +499,7 @@ class AI2thorImageDataset(data.Dataset):
     def augment(self, img):
         data_patches = np.stack([img[:, i * 32:(i + 1) * 32] for i in range(8)])
         index_list = np.arange(0, 8).tolist()
-        random_cut = np.random.randint(8)
+        random_cut = np.random.randint(1, 8)
         index_list = index_list[random_cut:] + index_list[:random_cut]
         permuted_patches = data_patches[index_list]
         augmented_img = np.concatenate(np.split(permuted_patches, 8, axis=0), 2)[0]
@@ -509,7 +507,33 @@ class AI2thorImageDataset(data.Dataset):
 
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
-        x_aug = self.augment(x)
+        l_x, l_y, _, _ = self.data_list[index].split("/")[-1].split(".png")[0].split("|")
+        l_x, l_y = float(l_x), float(l_y)
+        l_r = np.random.randint(8) * 45
+        p = np.random.randint(9)
+        if p == 0:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x - 0.25), '%.2f' % (l_y-0.25), '%d' % l_r]) + "|0.png")
+        elif p == 1:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x - 0.25), '%.2f' % l_y, '%d' % l_r]) + "|0.png")
+        elif p == 2:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x - 0.25), '%.2f' % (l_y+0.25), '%d' % l_r]) + "|0.png")
+        elif p == 3:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x), '%.2f' % (l_y-0.25), '%d' % l_r]) + "|0.png")
+        elif p == 4:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x), '%.2f' % (l_y), '%d' % l_r]) + "|0.png")
+        elif p == 5:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x), '%.2f' % (l_y+0.25), '%d' % l_r]) + "|0.png")
+        elif p == 6:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x+0.25), '%.2f' % (l_y-0.25), '%d' % l_r]) + "|0.png")
+        elif p == 7:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x+0.25), '%.2f' % (l_y), '%d' % l_r]) + "|0.png")
+        elif p == 8:
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x+0.25), '%.2f' % (l_y+0.25), '%d' % l_r]) + "|0.png")
+
+        if os.path.exists(x_aug_data):
+            x_aug = plt.imread(x_aug_data)
+        else:
+            x_aug = self.augment(x)
         q = torch.tensor(x[...,:3]).permute(2,0,1)
         k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
         if self.noisydepth:
