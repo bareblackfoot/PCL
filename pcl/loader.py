@@ -244,6 +244,7 @@ class HabitatImageSemDataset(data.Dataset):
         self.base_transform = base_transform
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
+        self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -266,6 +267,8 @@ class HabitatImageSemDataset(data.Dataset):
     def pull_image(self, index):
         scene = self.data_list[index].split("/")[-3]
         scene_idx = self.scenes.index(scene)
+        place = self.data_list[index].split("/")[-2]
+        place_idx = self.places.index(place)
         scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-3] == scene]
         scene_data_list.remove(self.data_list[index])
         idx = np.random.randint(len(scene_data_list))
@@ -292,7 +295,7 @@ class HabitatImageSemDataset(data.Dataset):
         x_aug, x_aug_sem = self.augment(x, semantic_img)
         q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
         k = torch.tensor(np.concatenate([x_aug[...,:3], x_aug_sem], -1)).permute(2,0,1).float()
-        return [q, k, n], index, scene_idx
+        return [q, k, n], index, scene_idx, place_idx
 
 
 class HabitatImageSemEvalDataset(data.Dataset):

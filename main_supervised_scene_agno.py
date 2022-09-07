@@ -22,10 +22,9 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
-from pcl.resnet_sem import resnet18
 
 import pcl.loader
-import pcl.builder_scene as builder
+import pcl.builder
 import glob
 
 model_names = sorted(name for name in models.__dict__
@@ -104,8 +103,6 @@ parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
-parser.add_argument('--split', default='train', type=str,
-                    help='experiment directory')
 parser.add_argument(
     "--noisydepth",
     action='store_true',
@@ -140,77 +137,35 @@ def main():
     
     if not os.path.exists(args.exp_dir):
         os.mkdir(args.exp_dir)
-    
-    ngpus_per_node = torch.cuda.device_count()
-    if args.multiprocessing_distributed:
-        # Since we have ngpus_per_node processes per node, the total world_size
-        # needs to be adjusted accordingly
-        args.world_size = ngpus_per_node * args.world_size
-        # Use torch.multiprocessing.spawn to launch distributed processes: the
-        # main_worker process function
-        mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
-    else:
-        # Simply call main_worker function
-        main_worker(args.gpu, ngpus_per_node, args)
+
+    main_worker(args.gpu, args)
 
 
-def main_worker(gpu, ngpus_per_node, args):
+def main_worker(gpu, args):
     args.gpu = gpu
     
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
 
-    # suppress printing if not master    
-    if args.multiprocessing_distributed and args.gpu != 0:
-        def print_pass(*args):
-            pass
-        builtins.print = print_pass
-        
-    if args.distributed:
-        if args.dist_url == "env://" and args.rank == -1:
-            args.rank = int(os.environ["RANK"])
-        if args.multiprocessing_distributed:
-            # For multiprocessing distributed training, rank needs to be the
-            # global rank among all the processes
-            args.rank = args.rank * ngpus_per_node + gpu
-        dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
-                                world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = builder.MoCo(
-        resnet18,
-        args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
-
+    if args.noisydepth:
+        from resnet_pcl import resnet18
+        model = pcl.builder.MoCo(
+            resnet18,
+            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
+    else:
+        model = pcl.builder.MoCo(
+            models.__dict__[args.arch],
+            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     print(model)
 
-    if args.distributed:
-        # For multiprocessing distributed, DistributedDataParallel constructor
-        # should always set the single device scope, otherwise,
-        # DistributedDataParallel will use all available devices.
-        if args.gpu is not None:
-            torch.cuda.set_device(args.gpu)
-            model.cuda(args.gpu)
-            # When using a single GPU per process and per
-            # DistributedDataParallel, we need to divide the batch size
-            # ourselves based on the total number of GPUs we have
-            args.batch_size = int(args.batch_size / ngpus_per_node)
-            args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
-        else:
-            model.cuda()
-            # DistributedDataParallel will divide and allocate batch_size to all
-            # available GPUs if device_ids are not set
-            model = torch.nn.parallel.DistributedDataParallel(model)
-    elif args.gpu is not None:
-        torch.cuda.set_device(args.gpu)
-        model = model.cuda(args.gpu)
-        # comment out the following line for debugging
-        raise NotImplementedError("Only DistributedDataParallel is supported.")
-    else:
-        # AllGather implementation (batch shuffle, queue update, etc.) in
-        # this code only supports DistributedDataParallel.
-        raise NotImplementedError("Only DistributedDataParallel is supported.")
-
+    model.cuda()
+    # DistributedDataParallel will divide and allocate batch_size to all
+    # available GPUs if device_ids are not set
+    model = torch.nn.parallel.DistributedDataParallel(model)
+    torch.cuda.set_device(args.gpu)
+    model = model.cuda(args.gpu)
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
 
@@ -277,25 +232,23 @@ def main_worker(gpu, ngpus_per_node, args):
     # if "mp3" in args.data:
     #     data_dir = args.data
     # else:
+
     data_dir = os.path.join(args.data, "train")
     scenes = os.listdir(data_dir)
     for scene in scenes:
         places = glob.glob(os.path.join(data_dir, scene) + "/*")
         for place in places:
             train_data_list.extend(glob.glob(place + "/*_rgb.png"))
-    # for split in ['train', 'val']:
-    #     data_dir = os.path.join(args.data, split)
-    #     scenes = os.listdir(data_dir)
-    #     for scene in scenes:
-    #         places = glob.glob(os.path.join(data_dir, scene) + "/*")
-    #         for place in places:
-    #             train_data_list.extend(glob.glob(place + "/*_rgb.png"))
-    # train_data_list =train_data_list[100:]
-    train_dataset = pcl.loader.HabitatImageSemDataset(
+    # data_dir = os.path.join(args.data, "train")
+    # scenes = os.listdir(data_dir)
+    # for scene in scenes:
+    #     train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
+        # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
+    train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
         transforms.Compose(augmentation),
         args.noisydepth)
-    eval_dataset = pcl.loader.HabitatImageSemEvalDataset(
+    eval_dataset = pcl.loader.HabitatImageEvalDataset(
         train_data_list,
         eval_augmentation,
         args.noisydepth)
@@ -350,8 +303,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args, cluster_result)
 
-        if (epoch+1)%5==0 and (not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank % ngpus_per_node == 0)):
+        if (epoch+1)%5==0:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': args.arch,
@@ -386,20 +338,21 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
             images[2] = images[2].cuda(args.gpu, non_blocking=True)
             scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
+            place_idx = place_idx.cuda(args.gpu, non_blocking=True)
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
                 
         # compute output
-        output, target, output_adv, target_adv, output_proto, target_proto = model(im_q=images[0], im_k=images[1], im_n=images[2], scene_idx=scene_idx, cluster_result=cluster_result, index=index)
+        output, target,  output_adv, target_adv, output_proto, target_proto = model(im_q=images[0], im_k=images[1], im_n=images[2], scene_idx=scene_idx, cluster_result=cluster_result, index=index)
         
         # InfoNCE loss
         loss = criterion(output, target)  
 
         # Adversarial loss
-        loss_adv = -0.001 * criterion(output_adv, target_adv)
+        loss_adv = -0.01 * criterion(output_adv, target_adv)
 
         # Scene loss
-        # loss_scene = torch.clip(1.0-0.1 * criterion(adv_feat, scene_idx), 0.0)
+        # loss_scene = torch.clip(1.0-0.1 * criterion(feat, scene_idx), 0.0)
         loss += loss_adv
 
         # ProtoNCE loss
