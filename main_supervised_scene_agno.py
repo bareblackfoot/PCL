@@ -24,12 +24,12 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 import pcl.loader
-import pcl.builder
+import sup.builder
 import glob
 
-model_names = sorted(name for name in models.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(models.__dict__[name]))
+model_names = sorted(name for name in sup.__dict__
+                     if name.islower() and not name.startswith("__")
+                     and callable(sup.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('data', metavar='DIR',
@@ -149,23 +149,17 @@ def main_worker(gpu, args):
 
     # create model
     print("=> creating model '{}'".format(args.arch))
-    if args.noisydepth:
-        from resnet_pcl import resnet18
-        model = pcl.builder.MoCo(
-            resnet18,
-            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
-    else:
-        model = pcl.builder.MoCo(
-            models.__dict__[args.arch],
-            args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
+    model = sup.builder.MoCo(
+        models.__dict__[args.arch],
+        args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     print(model)
 
     model.cuda()
     # DistributedDataParallel will divide and allocate batch_size to all
     # available GPUs if device_ids are not set
-    model = torch.nn.parallel.DistributedDataParallel(model)
-    torch.cuda.set_device(args.gpu)
-    model = model.cuda(args.gpu)
+    # model = torch.nn.parallel.DistributedDataParallel(model)
+    # torch.cuda.set_device(args.gpu)
+    # model = model.cuda()
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
 
@@ -253,12 +247,12 @@ def main_worker(gpu, args):
         eval_augmentation,
         args.noisydepth)
     
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-        eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
-    else:
-        train_sampler = None
-        eval_sampler = None
+    # if args.distributed:
+    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    #     eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
+    # else:
+    train_sampler = None
+    eval_sampler = None
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
@@ -335,40 +329,21 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
 
         if args.gpu is not None:
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
-            images[1] = images[1].cuda(args.gpu, non_blocking=True)
-            images[2] = images[2].cuda(args.gpu, non_blocking=True)
+            # images[1] = images[1].cuda(args.gpu, non_blocking=True)
+            # images[2] = images[2].cuda(args.gpu, non_blocking=True)
             scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
             place_idx = place_idx.cuda(args.gpu, non_blocking=True)
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
                 
         # compute output
-        output, target,  output_adv, target_adv, output_proto, target_proto = model(im_q=images[0], im_k=images[1], im_n=images[2], scene_idx=scene_idx, cluster_result=cluster_result, index=index)
+        output = model(image=images[0])
         
-        # InfoNCE loss
-        loss = criterion(output, target)  
-
-        # Adversarial loss
-        loss_adv = -0.01 * criterion(output_adv, target_adv)
-
-        # Scene loss
-        # loss_scene = torch.clip(1.0-0.1 * criterion(feat, scene_idx), 0.0)
-        loss += loss_adv
-
-        # ProtoNCE loss
-        if output_proto is not None:
-            loss_proto = 0
-            for proto_out,proto_target in zip(output_proto, target_proto):
-                loss_proto += criterion(proto_out, proto_target)  
-                accp = accuracy(proto_out, proto_target)[0] 
-                acc_proto.update(accp[0], images[0].size(0))
-                
-            # average loss across all sets of prototypes
-            loss_proto /= len(args.num_cluster) 
-            loss += loss_proto   
+        # Cross Entropy loss
+        loss = criterion(output, place_idx)
 
         losses.update(loss.item(), images[0].size(0))
-        acc = accuracy(output, target)[0] 
+        acc = accuracy(output, place_idx)[0]
         acc_inst.update(acc[0], images[0].size(0))
 
         # compute gradient and do SGD step

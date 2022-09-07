@@ -178,7 +178,8 @@ class HabitatImageDataset(data.Dataset):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
-        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
+        self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -196,8 +197,10 @@ class HabitatImageDataset(data.Dataset):
         return augmented_img
 
     def pull_image(self, index):
-        scene = self.data_list[index].split("/")[-2]
+        scene = self.data_list[index].split("/")[-3]
         scene_idx = self.scenes.index(scene)
+        place = self.data_list[index].split("/")[-2]
+        place_idx = self.places.index(place)
         scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == scene]
         scene_data_list.remove(self.data_list[index])
         idx = np.random.randint(len(scene_data_list))
@@ -212,14 +215,15 @@ class HabitatImageDataset(data.Dataset):
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
             k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
-        return [q, k, n], index, scene_idx
+        return [q, k, n], index, scene_idx, place_idx
 
 class HabitatImageEvalDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
-        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
+        self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -228,13 +232,15 @@ class HabitatImageEvalDataset(data.Dataset):
         return len(self.data_list)
 
     def pull_image(self, index):
-        scene = self.data_list[index].split("/")[-2]
+        scene = self.data_list[index].split("/")[-3]
         scene_idx = self.scenes.index(scene)
+        place = self.data_list[index].split("/")[-2]
+        place_idx = self.places.index(place)
         x = plt.imread(self.data_list[index])
         q = torch.tensor(x[...,:3]).permute(2,0,1)
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-        return q, index, scene_idx
+        return q, index, scene_idx, place_idx
 
 
 
