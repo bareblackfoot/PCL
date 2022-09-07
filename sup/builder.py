@@ -10,7 +10,7 @@ class MoCo(nn.Module):
     https://arxiv.org/abs/1911.05722
     """
 
-    def __init__(self, base_encoder, dim=128, r=16384, m=0.999, T=0.1, mlp=False):
+    def __init__(self, base_encoder, dim=128, category_dim=31, r=16384, m=0.999, T=0.1, mlp=False):
         """
         dim: feature dimension (default: 128)
         r: queue size; number of negative samples/prototypes (default: 16384)
@@ -27,8 +27,10 @@ class MoCo(nn.Module):
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder.fc.weight.shape[1]
             self.encoder.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder.fc)
+        self.class_layer = nn.Sequential(nn.ReLU(), nn.Linear(dim, category_dim))
 
     def forward(self, image):
         # compute query features
         q = self.encoder(image)  # queries: NxC
+        q = self.class_layer(q)
         return q

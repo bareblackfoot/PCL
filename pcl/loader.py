@@ -201,7 +201,7 @@ class HabitatImageDataset(data.Dataset):
         scene_idx = self.scenes.index(scene)
         place = self.data_list[index].split("/")[-2]
         place_idx = self.places.index(place)
-        scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == scene]
+        scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-3] == scene]
         scene_data_list.remove(self.data_list[index])
         idx = np.random.randint(len(scene_data_list))
         negative_sample = scene_data_list[idx]

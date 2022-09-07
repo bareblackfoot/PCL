@@ -27,9 +27,9 @@ import pcl.loader
 import sup.builder
 import glob
 
-model_names = sorted(name for name in sup.__dict__
+model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
-                     and callable(sup.__dict__[name]))
+                     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('data', metavar='DIR',
@@ -83,6 +83,8 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 
 parser.add_argument('--low-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
+parser.add_argument('--category-dim', default=31, type=int,
+                    help='category dimension (default: 31)')
 parser.add_argument('--pcl-r', default=16384, type=int,
                     help='queue size; number of negative pairs; needs to be smaller than num_cluster (default: 16384)')
 parser.add_argument('--moco-m', default=0.999, type=float,
@@ -151,7 +153,7 @@ def main_worker(gpu, args):
     print("=> creating model '{}'".format(args.arch))
     model = sup.builder.MoCo(
         models.__dict__[args.arch],
-        args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
+        args.low_dim, args.category_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     print(model)
 
     model.cuda()
@@ -311,12 +313,11 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
-    acc_inst = AverageMeter('Acc@Inst', ':6.2f')   
-    acc_proto = AverageMeter('Acc@Proto', ':6.2f')
+    acc_place = AverageMeter('Acc@Inst', ':6.2f')
     
     progress = ProgressMeter(
         len(train_loader),
-        [batch_time, data_time, losses, acc_inst, acc_proto],
+        [batch_time, data_time, losses, acc_place],
         prefix="Epoch: [{}]".format(epoch))
 
     # switch to train mode
@@ -344,7 +345,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
 
         losses.update(loss.item(), images[0].size(0))
         acc = accuracy(output, place_idx)[0]
-        acc_inst.update(acc[0], images[0].size(0))
+        acc_place.update(acc[0], images[0].size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
