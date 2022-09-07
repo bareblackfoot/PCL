@@ -21,6 +21,8 @@ class MoCo(nn.Module):
         self.r = r
         self.m = m
         self.T = T
+        self.AT = 0.8
+
 
         # create the encoders
         # num_classes is the output fc dimension
@@ -168,7 +170,7 @@ class MoCo(nn.Module):
         logits_adv = torch.cat([l_pos_adv, l_neg_adv], dim=1)
 
         # apply temperature
-        # logits_adv /=
+        logits_adv /= self.AT
 
         # labels: positive key indicators
         labels_adv = torch.zeros(logits_adv.shape[0], dtype=torch.long).cuda()

@@ -25,7 +25,7 @@ import torchvision.models as models
 from pcl.resnet_sem import resnet18
 
 import pcl.loader
-import pcl.builder
+import pcl.builder_scene as builder
 import glob
 
 model_names = sorted(name for name in models.__dict__
@@ -177,7 +177,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = pcl.builder.MoCo(
+    model = builder.MoCo(
         resnet18,
         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
 
