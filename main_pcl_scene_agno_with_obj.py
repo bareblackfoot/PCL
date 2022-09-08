@@ -282,7 +282,9 @@ def main_worker(gpu, ngpus_per_node, args):
     for scene in scenes:
         places = glob.glob(os.path.join(data_dir, scene) + "/*")
         for place in places:
-            train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+            place_name = place.split("/")[-1]
+            if place_name != "unknown":
+                train_data_list.extend(glob.glob(place + "/*_rgb.png"))
     # for split in ['train', 'val']:
     #     data_dir = os.path.join(args.data, split)
     #     scenes = os.listdir(data_dir)
