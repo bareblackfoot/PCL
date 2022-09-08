@@ -238,14 +238,14 @@ def eval(data_loader, model, args):
         data_time.update(time.time() - end)
 
         if args.gpu is not None:
-            images[0] = images[0].cuda(args.gpu, non_blocking=True)
+            images = images.cuda(args.gpu, non_blocking=True)
             place_idx = place_idx.cuda(args.gpu, non_blocking=True)
                 
         # compute output
-        output = model(image=images[0])
+        output = model(image=images)
 
         acc = accuracy(output, place_idx)[0]
-        acc_place.update(acc[0], images[0].size(0))
+        acc_place.update(acc, images.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
