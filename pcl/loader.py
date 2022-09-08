@@ -180,6 +180,12 @@ class HabitatImageDataset(data.Dataset):
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
         self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        data_dir = "/".join(self.data_list[0].split("/")[-3]).replace("val", "train")
+        scenes = os.listdir(data_dir)
+        places = []
+        for scene in scenes:
+            places.append(glob.glob(os.path.join(data_dir, scene) + "/*"))
+        self.places = sorted(np.unique(places))
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -224,6 +230,13 @@ class HabitatImageEvalDataset(data.Dataset):
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
         self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        data_dir = "/".join(self.data_list[0].split("/")[:-3]).replace("val", "train")
+        scenes = os.listdir(data_dir)
+        places = []
+        for scene in scenes:
+            places.append(glob.glob(os.path.join(data_dir, scene) + "/*"))
+        places = np.concatenate(places)
+        self.places = sorted(np.unique([places[i].split("/")[-1] for i in range(len(places))]))
 
     def __getitem__(self, index):
         return self.pull_image(index)
