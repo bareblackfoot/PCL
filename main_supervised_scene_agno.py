@@ -268,30 +268,6 @@ def main_worker(gpu, args):
     for epoch in range(args.start_epoch, args.epochs):
         
         cluster_result = None
-        if epoch>=args.warmup_epoch:
-            # compute momentum features for center-cropped images
-            features = compute_features(eval_loader, model, args)         
-            
-            # placeholder for clustering result
-            cluster_result = {'im2cluster':[],'centroids':[],'density':[]}
-            for num_cluster in args.num_cluster:
-                cluster_result['im2cluster'].append(torch.zeros(len(eval_dataset),dtype=torch.long).cuda())
-                cluster_result['centroids'].append(torch.zeros(int(num_cluster),args.low_dim).cuda())
-                cluster_result['density'].append(torch.zeros(int(num_cluster)).cuda()) 
-
-            if args.gpu == 0:
-                features[torch.norm(features,dim=1)>1.5] /= 2 #account for the few samples that are computed twice  
-                features = features.numpy()
-                cluster_result = run_kmeans(features,args)  #run kmeans clustering on master node
-                # save the clustering result
-                # torch.save(cluster_result,os.path.join(args.exp_dir, 'clusters_%d'%epoch))  
-                
-            dist.barrier()  
-            # broadcast clustering result
-            for k, data_list in cluster_result.items():
-                for data_tensor in data_list:                
-                    dist.broadcast(data_tensor, 0, async_op=False)     
-    
         if args.distributed:
             train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
@@ -359,19 +335,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         if i % args.print_freq == 0:
             progress.display(i)
 
-            
-def compute_features(eval_loader, model, args):
-    print('Computing features...')
-    model.eval()
-    features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
-    for i, (images, index, _) in enumerate(tqdm(eval_loader)):
-        with torch.no_grad():
-            images = images.cuda(non_blocking=True)
-            feat = model(images,is_eval=True) 
-            features[index] = feat
-    dist.barrier()        
-    dist.all_reduce(features, op=dist.ReduceOp.SUM)     
-    return features.cpu()
 
     
 def run_kmeans(x, args):
