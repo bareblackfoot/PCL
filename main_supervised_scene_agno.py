@@ -50,7 +50,7 @@ parser.add_argument('-b', '--batch-size', default=256, type=int,
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--lr', '--learning-rate', default=0.03, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.0001, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--schedule', default=[120, 160], nargs='*', type=int,
                     help='learning rate schedule (when to drop lr by 10x)')
@@ -165,8 +165,7 @@ def main_worker(gpu, args):
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
 
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-                                momentum=args.momentum,
+    optimizer = torch.optim.Adam(model.parameters(), args.lr,
                                 weight_decay=args.weight_decay)
 
     # optionally resume from a checkpoint
@@ -222,13 +221,8 @@ def main_worker(gpu, args):
         transforms.ToTensor(),
         normalize
         ])
-    # "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
 
     train_data_list = []
-    # if "mp3" in args.data:
-    #     data_dir = args.data
-    # else:
-
     data_dir = os.path.join(args.data, "train")
     scenes = os.listdir(data_dir)
     for scene in scenes:
@@ -237,11 +231,7 @@ def main_worker(gpu, args):
             place_name = place.split("/")[-1]
             if place_name != "unknown":
                 train_data_list.extend(glob.glob(place + "/*_rgb.png"))
-    # data_dir = os.path.join(args.data, "train")
-    # scenes = os.listdir(data_dir)
-    # for scene in scenes:
-    #     train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*"))
-        # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
+
     train_dataset = pcl.loader.HabitatImageDataset(
         train_data_list,
         transforms.Compose(augmentation),
@@ -250,11 +240,7 @@ def main_worker(gpu, args):
         train_data_list,
         eval_augmentation,
         args.noisydepth)
-    
-    # if args.distributed:
-    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    #     eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
-    # else:
+
     train_sampler = None
     eval_sampler = None
 
