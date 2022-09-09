@@ -217,8 +217,8 @@ class HabitatImageDataset(data.Dataset):
         x = plt.imread(self.data_list[index])
         x_aug = self.augment(x)
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray(x))
-            k = self.base_transform(Image.fromarray(x_aug))
+            q = self.base_transform(Image.fromarray(x[...,:3].astype(np.uint8)))
+            k = self.base_transform(Image.fromarray(x_aug[...,:3].astype(np.uint8)))
         else:
             q = torch.tensor(x[...,:3]).permute(2,0,1)
             k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
@@ -255,7 +255,7 @@ class HabitatImageEvalDataset(data.Dataset):
         place_idx = self.places.index(place)
         x = plt.imread(self.data_list[index])
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray(x))
+            q = self.base_transform(Image.fromarray(x[...,:3].astype(np.uint8)))
         else:
             q = torch.tensor(x[...,:3]).permute(2,0,1)
         if self.noisydepth:
