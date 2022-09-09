@@ -148,12 +148,62 @@ def main_worker(gpu, args):
     
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    if args.aug_plus:
+        # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
+        augmentation = [
+            transforms.RandomApply([
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
+            ], p=0.8),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize
+        ]
+    else:
+        # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
+        augmentation = [
+            transforms.RandomGrayscale(p=0.2),
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize
+        ]
+
+    # center-crop augmentation
+    eval_augmentation = transforms.Compose([
+        transforms.ToTensor(),
+        normalize
+    ])
+
+    train_data_list = []
+    data_dir = os.path.join(args.data, "train")
+    scenes = os.listdir(data_dir)
+    for scene in scenes:
+        places = glob.glob(os.path.join(data_dir, scene) + "/*")
+        for place in places:
+            place_name = place.split("/")[-1]
+            if place_name != "unknown":
+                train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+
+    train_dataset = pcl.loader.HabitatImageDataset(
+        train_data_list,
+        transforms.Compose(augmentation),
+        args.noisydepth)
+    print("num places", len(train_dataset.places))
+    eval_dataset = pcl.loader.HabitatImageEvalDataset(
+        train_data_list,
+        eval_augmentation,
+        args.noisydepth)
 
     # create model
     print("=> creating model '{}'".format(args.arch))
     model = sup.builder.MoCo(
         models.__dict__[args.arch],
-        args.low_dim, args.category_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
+        args.low_dim, len(train_dataset.places), args.pcl_r, args.moco_m, args.temperature, args.mlp)
     print(model)
 
     model.cuda()
@@ -191,55 +241,7 @@ def main_worker(gpu, args):
     # Data loading code
     # traindir =args.data
     # traindir = os.path.join(args.data, 'train')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    
-    if args.aug_plus:
-        # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
-        augmentation = [
-            transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-            ], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]
-    else:
-        # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
-        augmentation = [
-            transforms.RandomGrayscale(p=0.2),
-            transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]
 
-    # center-crop augmentation 
-    eval_augmentation = transforms.Compose([
-        transforms.ToTensor(),
-        normalize
-        ])
-
-    train_data_list = []
-    data_dir = os.path.join(args.data, "train")
-    scenes = os.listdir(data_dir)
-    for scene in scenes:
-        places = glob.glob(os.path.join(data_dir, scene) + "/*")
-        for place in places:
-            place_name = place.split("/")[-1]
-            if place_name != "unknown":
-                train_data_list.extend(glob.glob(place + "/*_rgb.png"))
-
-    train_dataset = pcl.loader.HabitatImageDataset(
-        train_data_list,
-        transforms.Compose(augmentation),
-        args.noisydepth)
-    eval_dataset = pcl.loader.HabitatImageEvalDataset(
-        train_data_list,
-        eval_augmentation,
-        args.noisydepth)
 
     train_sampler = None
     eval_sampler = None

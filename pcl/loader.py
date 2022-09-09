@@ -263,7 +263,6 @@ class HabitatImageEvalDataset(data.Dataset):
         return q, index, scene_idx, place_idx
 
 
-
 class HabitatImageSemDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
