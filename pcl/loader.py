@@ -467,27 +467,40 @@ class HabitatObjectDataset(data.Dataset):
 
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
-        same_obj_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))
-        same_obj_data = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz'))
-        idx = np.random.randint(len(same_obj_images))
-        x_aug = plt.imread(same_obj_images[idx])
+
         q = torch.tensor(x[...,:3]).permute(2,0,1)
-        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
 
-        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
-
-        q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
-        # input_width = (q_bbox[:, 2] - q_bbox[:, 0])
-        # input_height = (q_bbox[:, 3] - q_bbox[:, 1])
-        # q_bbox = self.add_bbox_noise(q_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
+        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz').replace("image", "bboxes"))
+        same_obj_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))
+        same_obj_data = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz').replace("image", "bboxes"))
+        bbox_idx = np.random.randint(len(q_loc))
+        q_bbox = np.array(q_loc['bboxes'][bbox_idx]).reshape(-1, 4)
+        q_bbox_loc = np.array(q_loc['bbox_locations'][bbox_idx])
+        q_bbox_category = np.array(q_loc['bbox_categories'][bbox_idx])
         q_loc = torch.tensor([0] + list(q_bbox[0]))
-        k_loc = joblib.load(same_obj_data[idx])
-        k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
+        same_obj = False
+        while not same_obj:
+            idx = np.random.randint(len(same_obj_data))
+            k_loc = joblib.load(same_obj_data[idx])
+            k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
+            k_bbox_loc = np.array(k_loc['bbox_locations'])
+            k_bbox_category = np.array(k_loc['bbox_categories'])
+            idx_a = np.where(np.all(k_bbox_loc == q_bbox_loc, -1))[0]
+            idx_c = np.where(k_bbox_category == q_bbox_category)[0]
+            same_idx = np.intersect1d(idx_a, idx_c)
+            if len(same_idx) > 0:
+                same_obj = True
+                same_idx= same_idx[0]
+                k_bbox = k_bbox[same_idx]
+
+        x_aug = plt.imread(same_obj_images[idx])
+        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+        k_bbox = np.array(k_bbox).reshape(-1, 4)
         k_bbox = self.reduce_half(k_bbox)
         input_width = (k_bbox[:, 2] - k_bbox[:, 0])
         input_height = (k_bbox[:, 3] - k_bbox[:, 1])
 
-        k_bbox = self.add_bbox_noise(k_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
+        k_bbox = self.add_bbox_noise(k_bbox, noise_amount=0.01, input_height=input_height, input_width=input_width)
         k_loc = torch.tensor([0] + list(k_bbox[0]))
         return [q, k], [q_loc, k_loc], index
 

@@ -272,10 +272,10 @@ def main_worker(gpu, ngpus_per_node, args):
     # DATA_DIR = "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
     # train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
     data_dir = args.data_dir #
-    scenes_objects = os.listdir(data_dir)
+    scenes = os.listdir(data_dir)
     train_data_list = []
-    for scenes_object in scenes_objects:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scenes_object}/*.png"))
+    for scene in scenes:
+        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/image/*|0.png"))
     train_dataset = pcl.loader.HabitatObjectDataset(
         train_data_list,
         transforms.Compose(augmentation),
