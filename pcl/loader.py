@@ -622,21 +622,20 @@ class AI2ThorObjectDataset(data.Dataset):
         return input_object_t
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])
-
+        x = plt.imread(self.data_list[index].replace('objects', 'image').replace("|" + self.data_list[index].split("|")[-1], '.png'))
         q = torch.tensor(x[...,:3]).permute(2,0,1)
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz').replace("image", "bboxes"))
-        same_scene_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))
-        same_scene_obj = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz').replace("image", "bboxes"))
-        bbox_idx = np.random.randint(len(q_loc))
-        q_bbox = np.array(q_loc['bboxes'][bbox_idx]).reshape(-1, 4)
-        q_bbox_loc = np.array(q_loc['bbox_locations'][bbox_idx])
-        q_bbox_category = np.array(q_loc['bbox_categories'][bbox_idx])
+        # same_scene_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*|0.png').replace("objects", "image"))
+        same_scene_obj = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz'))
+        q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
+        q_bbox_loc = np.array(q_loc['bbox_locations'])
+        q_bbox_category = np.array(q_loc['bbox_categories'])
         q_loc = torch.tensor([0] + list(q_bbox[0]))
-        same_obj = False
-        while not same_obj:
+        while True:
             idx = np.random.randint(len(same_scene_obj))
+            if same_scene_obj[idx] == self.data_list[index]:
+                continue
             k_loc = joblib.load(same_scene_obj[idx])
             k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
             k_bbox_loc = np.array(k_loc['bbox_locations'])
@@ -645,11 +644,13 @@ class AI2ThorObjectDataset(data.Dataset):
             idx_c = np.where(k_bbox_category == q_bbox_category)[0]
             same_idx = np.intersect1d(idx_a, idx_c)
             if len(same_idx) > 0:
-                same_obj = True
-                same_idx= same_idx[0]
+                idxx = np.random.randint(len(same_idx))
+                same_idx= same_idx[idxx]
                 k_bbox = k_bbox[same_idx]
+                image_name = "|".join(same_scene_obj[idx].split("/")[-1].split("|")[:-1])
+                break
 
-        x_aug = plt.imread(same_scene_images[idx])
+        x_aug = plt.imread(os.path.join("/".join(self.data_list[index].split("/")[:-1]).replace("objects","image"), image_name+ ".png"))
         k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
         k_bbox = np.array(k_bbox).reshape(-1, 4)
         k_bbox = self.reduce_half(k_bbox)

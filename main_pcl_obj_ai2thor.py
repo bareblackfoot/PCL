@@ -275,7 +275,7 @@ def main_worker(gpu, ngpus_per_node, args):
     scenes = os.listdir(data_dir)
     train_data_list = []
     for scene in scenes:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/image/*|0.png"))
+        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/objects/*"))
     train_dataset = pcl.loader.AI2ThorObjectDataset(
         train_data_list,
         transforms.Compose(augmentation),
