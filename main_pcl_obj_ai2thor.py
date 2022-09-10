@@ -276,11 +276,11 @@ def main_worker(gpu, ngpus_per_node, args):
     train_data_list = []
     for scene in scenes:
         train_data_list.extend(glob.glob(f"{data_dir}/{scene}/image/*|0.png"))
-    train_dataset = pcl.loader.HabitatObjectDataset(
+    train_dataset = pcl.loader.AI2ThorObjectDataset(
         train_data_list,
         transforms.Compose(augmentation),
         args.noisydepth)
-    eval_dataset = pcl.loader.HabitatObjectEvalDataset(
+    eval_dataset = pcl.loader.AI2ThorObjectEvalDataset(
         train_data_list,
         eval_augmentation,
         args.noisydepth)
