@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import joblib, glob, os, cv2
 from PIL import Image
+from habitat_sim.utils.common import d3_40_colors_rgb
 
 
 class TwoCropsTransform:
@@ -296,6 +297,21 @@ class HabitatImageSemDataset(data.Dataset):
         scene_idx = self.scenes.index(scene)
         place = self.data_list[index].split("/")[-2]
         place_idx = self.places.index(place)
+
+        same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == place]
+        same_place_list.remove(self.data_list[index])
+        idx = np.random.randint(len(same_place_list))
+        sp_sample = same_place_list[idx]
+        sp = plt.imread(sp_sample)
+        n_sem = cv2.imread(sp_sample.replace("rgb", "sem"))[...,0:1]
+        semantic_img = Image.new(
+            "P", (n_sem.shape[1], n_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((n_sem.flatten() % 40).astype(np.uint8))
+        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        sp = torch.tensor(np.concatenate([sp[...,:3], semantic_img], -1)).permute(2,0,1).float()
+
         scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-3] == scene]
         scene_data_list.remove(self.data_list[index])
         idx = np.random.randint(len(scene_data_list))
@@ -305,7 +321,7 @@ class HabitatImageSemDataset(data.Dataset):
         semantic_img = Image.new(
             "P", (n_sem.shape[1], n_sem.shape[0])
         )
-        from habitat_sim.utils.common import d3_40_colors_rgb
+        # from habitat_sim.utils.common import d3_40_colors_rgb
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((n_sem.flatten() % 40).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
@@ -322,7 +338,7 @@ class HabitatImageSemDataset(data.Dataset):
         x_aug, x_aug_sem = self.augment(x, semantic_img)
         q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
         k = torch.tensor(np.concatenate([x_aug[...,:3], x_aug_sem], -1)).permute(2,0,1).float()
-        return [q, k, n], index, scene_idx, place_idx
+        return [q, k, n, sp], index, scene_idx, place_idx
 
 
 class HabitatImageSemEvalDataset(data.Dataset):

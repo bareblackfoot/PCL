@@ -22,6 +22,7 @@ class MoCo(nn.Module):
         self.m = m
         self.T = T
         self.AT = 0.8
+        self.ST = 0.4
 
 
         # create the encoders
@@ -119,7 +120,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k=None, im_n=None, scene_idx=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, im_q, im_k=None, im_n=None, im_sp=None, scene_idx=None, is_eval=False, cluster_result=None, index=None):
         """
         Input:
             im_q: a batch of query images
@@ -149,21 +150,25 @@ class MoCo(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
+        # compute same place features
+        sp = self.encoder_q(im_sp)  # queries: NxC
+        sp = nn.functional.normalize(sp, dim=1)
+        l_pos_sp = torch.einsum('nc,nc->n', [sp, k]).unsqueeze(-1)
+        l_neg_sp = torch.einsum('nc,ck->nk', [sp,  self.queue.clone().detach()])
+
+        # logits: Nx(1+r)
+        logits_sp = torch.cat([l_pos_sp, l_neg_sp], dim=1)
+
+        # apply temperature
+        logits_sp /= self.ST
+
+        # labels: positive key indicators
+        labels_sp = torch.zeros(logits_sp.shape[0], dtype=torch.long).cuda()
+
         # compute negative features
         n = self.encoder_q(im_n)  # queries: NxC
         n = nn.functional.normalize(n, dim=1)
         l_pos_adv = torch.einsum('nc,nc->n', [n, k]).unsqueeze(-1)
-        # negative logits: Nxr
-        # aa = list(self.queue_l.clone().cpu().detach().numpy())
-        # neg_idx = list(np.arange(len(aa)))
-        # for si in scene_idx:
-        #     self.queue.clone().detach()
-        #     idxs = np.where([j == si.item() for j in np.stack(aa)])[0]
-        #     for idx in idxs:
-        #         if idx in neg_idx:
-        #             neg_idx.remove(idx)
-        # valid_neg_idx = torch.from_numpy(np.stack(neg_idx)).cuda()[:self.r//2]
-        # l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()[:, valid_neg_idx]])
         l_neg_adv = torch.einsum('nc,ck->nk', [n,  self.queue.clone().detach()])
 
         # logits: Nx(1+r)
@@ -229,9 +234,9 @@ class MoCo(nn.Module):
                 
                 proto_labels.append(labels_proto)
                 proto_logits.append(logits_proto)
-            return logits, labels, logits_adv, labels_adv, proto_logits, proto_labels
+            return logits, labels, logits_adv, labels_adv, logits_sp, labels_sp, proto_logits, proto_labels
         else:
-            return logits, labels, logits_adv, labels_adv, None, None
+            return logits, labels, logits_adv, labels_adv, logits_sp, labels_sp, None, None
 
 
 # utils
