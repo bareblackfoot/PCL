@@ -299,7 +299,8 @@ class HabitatImageSemDataset(data.Dataset):
         place_idx = self.places.index(place)
 
         same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == place]
-        same_place_list.remove(self.data_list[index])
+        if len(same_place_list) > 1:
+            same_place_list.remove(self.data_list[index])
         idx = np.random.randint(len(same_place_list))
         sp_sample = same_place_list[idx]
         sp = plt.imread(sp_sample)
