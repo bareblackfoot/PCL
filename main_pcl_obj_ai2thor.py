@@ -306,7 +306,7 @@ def main_worker(gpu, ngpus_per_node, args):
     for epoch in range(args.start_epoch, args.epochs):
 
         selected_idx = np.random.choice(np.arange(len(all_train_data_list)), 2 ** 16)
-        train_data_list = all_train_data_list[selected_idx]
+        train_data_list = list(np.stack(all_train_data_list)[selected_idx])
         train_dataset = pcl.loader.AI2ThorObjectDataset(
             train_data_list,
             transforms.Compose(augmentation),
