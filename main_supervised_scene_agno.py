@@ -186,7 +186,8 @@ def main_worker(gpu, args):
         places = glob.glob(os.path.join(data_dir, scene) + "/*")
         for place in places:
             place_name = place.split("/")[-1]
-            if place_name != "unknown":
+            # if place_name != "unknown":
+            if place_name in ["kitchen", "bedroom", "bathroom","closet", "living room"]:
                 train_data_list.extend(glob.glob(place + "/*_rgb.png"))
 
     train_dataset = pcl.loader.HabitatImageDataset(

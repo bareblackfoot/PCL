@@ -83,7 +83,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 
 parser.add_argument('--low-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--category-dim', default=31, type=int,
+parser.add_argument('--category-dim', default=30, type=int,
                     help='category dimension (default: 31)')
 parser.add_argument('--pcl-r', default=16384, type=int,
                     help='queue size; number of negative pairs; needs to be smaller than num_cluster (default: 16384)')
@@ -206,7 +206,7 @@ def main_worker(gpu, args):
         for place in places:
             place_name = place.split("/")[-1]
             if place_name in train_places:
-                if place_name != "unknown":
+                if place_name in ["kitchen", "bedroom", "bathroom","closet", "living room"]:
                     data_list.extend(glob.glob(place + "/*_rgb.png"))
     eval_dataset = pcl.loader.HabitatImageEvalDataset(
         data_list,

@@ -179,7 +179,8 @@ class HabitatImageDataset(data.Dataset):
         self.base_transform = base_transform
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
-        self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        # self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        self.places = ["kitchen", "bedroom", "bathroom","closet", "living room"]
         # data_dir = "/".join(self.data_list[0].split("/")[:-3]).replace("val", "train")
         # scenes = os.listdir(data_dir)
         # places = []
@@ -233,14 +234,15 @@ class HabitatImageEvalDataset(data.Dataset):
         self.base_transform = base_transform
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
-        self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
-        data_dir = "/".join(self.data_list[0].split("/")[:-3]).replace("val", "train")
-        scenes = os.listdir(data_dir)
-        places = []
-        for scene in scenes:
-            places.append(glob.glob(os.path.join(data_dir, scene) + "/*"))
-        places = np.concatenate(places)
-        self.places = sorted(np.unique([places[i].split("/")[-1] for i in range(len(places))]))
+        # self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        # data_dir = "/".join(self.data_list[0].split("/")[:-3]).replace("val", "train")
+        # scenes = os.listdir(data_dir)
+        # places = []
+        # for scene in scenes:
+        #     places.append(glob.glob(os.path.join(data_dir, scene) + "/*"))
+        # places = np.concatenate(places)
+        # self.places = sorted(np.unique([places[i].split("/")[-1] for i in range(len(places))]))
+        self.places = ["kitchen", "bedroom", "bathroom","closet", "living room"]
 
     def __getitem__(self, index):
         return self.pull_image(index)
