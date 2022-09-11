@@ -273,9 +273,11 @@ def main_worker(gpu, ngpus_per_node, args):
     # train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
     data_dir = args.data_dir #
     scenes = os.listdir(data_dir)
-    train_data_list = []
+    all_train_data_list = []
     for scene in scenes:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/objects/*"))
+        all_train_data_list.extend(glob.glob(f"{data_dir}/{scene}/objects/*"))
+    selected_idx = np.random.choice(np.arange(len(all_train_data_list)), 2**16)
+    train_data_list = all_train_data_list[selected_idx]
     train_dataset = pcl.loader.AI2ThorObjectDataset(
         train_data_list,
         transforms.Compose(augmentation),
@@ -302,7 +304,27 @@ def main_worker(gpu, ngpus_per_node, args):
         sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
     
     for epoch in range(args.start_epoch, args.epochs):
-        
+
+        selected_idx = np.random.choice(np.arange(len(all_train_data_list)), 2 ** 16)
+        train_data_list = all_train_data_list[selected_idx]
+        train_dataset = pcl.loader.AI2ThorObjectDataset(
+            train_data_list,
+            transforms.Compose(augmentation),
+            args.noisydepth)
+        eval_dataset = pcl.loader.AI2ThorObjectEvalDataset(
+            train_data_list,
+            eval_augmentation,
+            args.noisydepth)
+
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+            num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+
+        # dataloader for center-cropped images, use larger batch size to increase speed
+        eval_loader = torch.utils.data.DataLoader(
+            eval_dataset, batch_size=args.batch_size * 5, shuffle=False,
+            sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
+
         cluster_result = None
         if epoch>=args.warmup_epoch:
             # compute momentum features for center-cropped images
