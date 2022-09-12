@@ -399,7 +399,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         loss = criterion(output, target)  
 
         # Adversarial loss
-        loss_adv = -0.001 * criterion(output_adv, target_adv)
+        loss_adv = -criterion(output_adv, target_adv)
 
         # Scene loss
         # loss_scene = torch.clip(1.0-0.1 * criterion(adv_feat, scene_idx), 0.0)
