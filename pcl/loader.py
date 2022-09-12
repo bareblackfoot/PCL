@@ -304,31 +304,32 @@ class HabitatImageSemDataset(data.Dataset):
         idx = np.random.randint(len(same_place_list))
         sp_sample = same_place_list[idx]
         sp = plt.imread(sp_sample)
-        n_sem = cv2.imread(sp_sample.replace("rgb", "sem"))[...,0:1]
-        semantic_img = Image.new(
-            "P", (n_sem.shape[1], n_sem.shape[0])
+        sp_sem_ = cv2.imread(sp_sample.replace("rgb", "sem"))[...,0:1]
+        sp_sem = Image.new(
+            "P", (sp_sem_.shape[1], sp_sem_.shape[0])
         )
-        semantic_img.putpalette(d3_40_colors_rgb.flatten())
-        semantic_img.putdata((n_sem.flatten() % 40).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        sp = torch.tensor(np.concatenate([sp[...,:3], semantic_img], -1)).permute(2,0,1).float()
+        sp_sem.putpalette(d3_40_colors_rgb.flatten())
+        sp_sem.putdata((sp_sem_.flatten() % 40).astype(np.uint8))
+        sp_sem = np.array(sp_sem.convert("RGBA"))[...,:3]/255.
+        # sp = torch.tensor(np.concatenate([sp[...,:3], semantic_img], -1)).permute(2,0,1).float()
 
         scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-3] == scene]
         scene_data_list.remove(self.data_list[index])
         idx = np.random.randint(len(scene_data_list))
         negative_sample = scene_data_list[idx]
         n = plt.imread(negative_sample)
-        n_sem = cv2.imread(negative_sample.replace("rgb", "sem"))[...,0:1]
-        semantic_img = Image.new(
-            "P", (n_sem.shape[1], n_sem.shape[0])
+        n_sem_ = cv2.imread(negative_sample.replace("rgb", "sem"))[...,0:1]
+        n_sem = Image.new(
+            "P", (n_sem_.shape[1], n_sem_.shape[0])
         )
         # from habitat_sim.utils.common import d3_40_colors_rgb
-        semantic_img.putpalette(d3_40_colors_rgb.flatten())
-        semantic_img.putdata((n_sem.flatten() % 40).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        n = torch.tensor(np.concatenate([n[...,:3], semantic_img], -1)).permute(2,0,1).float()
+        n_sem.putpalette(d3_40_colors_rgb.flatten())
+        n_sem.putdata((n_sem_.flatten() % 40).astype(np.uint8))
+        n_sem = np.array(n_sem.convert("RGBA"))[...,:3]/255.
+        # n = torch.tensor(np.concatenate([n[...,:3], semantic_img], -1)).permute(2,0,1).float()
 
         x = plt.imread(self.data_list[index])
+
         x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
@@ -337,8 +338,26 @@ class HabitatImageSemDataset(data.Dataset):
         semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
         x_aug, x_aug_sem = self.augment(x, semantic_img)
-        q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
-        k = torch.tensor(np.concatenate([x_aug[...,:3], x_aug_sem], -1)).permute(2,0,1).float()
+        if self.base_transform is not None:
+            q_rgb = self.base_transform(Image.fromarray((x[...,:3]*255.).astype(np.uint8)))
+            q_sem = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
+            k = self.base_transform(Image.fromarray((x_aug[...,:3]*255.).astype(np.uint8)))
+            k_sem = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
+            n = self.base_transform(Image.fromarray((n[...,:3]*255.).astype(np.uint8)))
+            n_sem = self.base_transform(Image.fromarray((n_sem*255.).astype(np.uint8)))
+            sp = self.base_transform(Image.fromarray((sp[...,:3]*255.).astype(np.uint8)))
+            sp_sem = self.base_transform(Image.fromarray((sp_sem*255.).astype(np.uint8)))
+            q = torch.cat([q_rgb, q_sem], 0)
+            k = torch.cat([k, k_sem], 0)
+            n = torch.cat([n, n_sem], 0)
+            sp = torch.cat([sp, sp_sem], 0)
+        else:
+            # q = torch.tensor(x[...,:3]).permute(2,0,1)
+            # k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+            q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
+            k = torch.tensor(np.concatenate([x_aug[...,:3], x_aug_sem], -1)).permute(2,0,1).float()
+            n = torch.tensor(np.concatenate([n[...,:3], n_sem], -1)).permute(2,0,1).float()
+            sp = torch.tensor(np.concatenate([sp[...,:3], sp_sem], -1)).permute(2,0,1).float()
         return [q, k, n, sp], index, scene_idx, place_idx
 
 
@@ -367,7 +386,12 @@ class HabitatImageSemEvalDataset(data.Dataset):
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
+        if self.base_transform is not None:
+            q_rgb = self.base_transform(Image.fromarray((x[...,:3]*255.).astype(np.uint8)))
+            q_sem = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
+            q = torch.cat([q_rgb, q_sem], 0)
+        else:
+            q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
         return q, index, scene_idx
 
 

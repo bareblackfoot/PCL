@@ -21,7 +21,7 @@ class MoCo(nn.Module):
         self.r = r
         self.m = m
         self.T = T
-        self.AT = 0.8
+        self.AT = 0.6
         self.ST = 0.4
 
 
