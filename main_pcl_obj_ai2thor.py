@@ -276,6 +276,10 @@ def main_worker(gpu, ngpus_per_node, args):
     all_train_data_list = []
     for scene in scenes:
         all_train_data_list.extend(glob.glob(f"{data_dir}/{scene}/objects/*"))
+    for i in range(len(all_train_data_list)):
+        obj_size = float(all_train_data_list[0].split("|")[-1].split(".dat.gz")[i])
+        if obj_size < 0.01:
+            all_train_data_list.remove(all_train_data_list[i])
     # selected_idx = np.random.choice(np.arange(len(all_train_data_list)), 2**16)
     # train_data_list = all_train_data_list[selected_idx]
     # train_dataset = pcl.loader.AI2ThorObjectDataset(
