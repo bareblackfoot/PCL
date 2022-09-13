@@ -280,6 +280,7 @@ def main_worker(gpu, ngpus_per_node, args):
         obj_size = float(all_train_data_list[i].split("|")[-1].split(".dat.gz")[0])
         if obj_size < 0.01:
             all_train_data_list.remove(all_train_data_list[i])
+    print(len(all_train_data_list))
     # selected_idx = np.random.choice(np.arange(len(all_train_data_list)), 2**16)
     # train_data_list = all_train_data_list[selected_idx]
     # train_dataset = pcl.loader.AI2ThorObjectDataset(
@@ -290,7 +291,7 @@ def main_worker(gpu, ngpus_per_node, args):
     #     train_data_list,
     #     eval_augmentation,
     #     args.noisydepth)
-    #
+
     # if args.distributed:
     #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     #     eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
