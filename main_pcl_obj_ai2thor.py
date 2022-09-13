@@ -277,7 +277,7 @@ def main_worker(gpu, ngpus_per_node, args):
     for scene in scenes:
         all_train_data_list.extend(glob.glob(f"{data_dir}/{scene}/objects/*"))
     for i in range(len(all_train_data_list)):
-        obj_size = float(all_train_data_list[0].split("|")[-1].split(".dat.gz")[i])
+        obj_size = float(all_train_data_list[i].split("|")[-1].split(".dat.gz")[0])
         if obj_size < 0.01:
             all_train_data_list.remove(all_train_data_list[i])
     # selected_idx = np.random.choice(np.arange(len(all_train_data_list)), 2**16)
