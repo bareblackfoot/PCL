@@ -274,6 +274,7 @@ def main_worker(gpu, ngpus_per_node, args):
     data_dir = args.data_dir #
     scenes = os.listdir(data_dir)
     all_train_data_list = []
+    print("Loading data from {}".format(data_dir))
     for scene in tqdm(scenes):
         aa = glob.glob(f"{data_dir}/{scene}/objects/*")
         if len(aa) > 0:
