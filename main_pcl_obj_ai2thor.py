@@ -276,12 +276,13 @@ def main_worker(gpu, ngpus_per_node, args):
     all_train_data_list = []
     for scene in tqdm(scenes):
         aa = glob.glob(f"{data_dir}/{scene}/objects/*")
-        bb = aa.copy()
-        for path_name in aa:
-            obj_size = float(path_name.split("|")[-1].split(".dat.gz")[0])
-            if obj_size < 0.01:
-                bb.remove(path_name)
-        all_train_data_list.extend(bb)
+        if len(aa) > 0:
+            bb = aa.copy()
+            for path_name in aa:
+                obj_size = float(path_name.split("|")[-1].split(".dat.gz")[0])
+                if obj_size < 0.01:
+                    bb.remove(path_name)
+            all_train_data_list.extend(bb)
     print(len(all_train_data_list))
     # selected_idx = np.random.choice(np.arange(len(all_train_data_list)), 2**16)
     # train_data_list = all_train_data_list[selected_idx]
