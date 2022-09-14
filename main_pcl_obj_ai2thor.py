@@ -284,33 +284,9 @@ def main_worker(gpu, ngpus_per_node, args):
                 if obj_size < 0.01:
                     bb.remove(path_name)
             all_train_data_list.extend(bb)
+        # if len(all_train_data_list)>0:
+        #     break
     print(len(all_train_data_list))
-    # selected_idx = np.random.choice(np.arange(len(all_train_data_list)), 2**16)
-    # train_data_list = all_train_data_list[selected_idx]
-    # train_dataset = pcl.loader.AI2ThorObjectDataset(
-    #     train_data_list,
-    #     transforms.Compose(augmentation),
-    #     args.noisydepth)
-    # eval_dataset = pcl.loader.AI2ThorObjectEvalDataset(
-    #     train_data_list,
-    #     eval_augmentation,
-    #     args.noisydepth)
-
-    # if args.distributed:
-    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    #     eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
-    # else:
-    #     train_sampler = None
-    #     eval_sampler = None
-
-    # train_loader = torch.utils.data.DataLoader(
-    #     train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-    #     num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
-    #
-    # # dataloader for center-cropped images, use larger batch size to increase speed
-    # eval_loader = torch.utils.data.DataLoader(
-    #     eval_dataset, batch_size=args.batch_size*5, shuffle=False,
-    #     sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
     
     for epoch in range(args.start_epoch, args.epochs):
 

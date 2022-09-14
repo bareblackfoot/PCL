@@ -665,42 +665,33 @@ class AI2ThorObjectDataset(data.Dataset):
         return input_object_t
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index].replace('objects', 'image').replace("|" + self.data_list[index].split("|")[-1], '.png'))
+        img_path = "|".join(self.data_list[index].split("|")[:-7]).replace("objects", "image") + ".png"
+        obj_cat = self.data_list[index].split("|")[5]
+        obj_loc = np.stack([float(j) for j in np.stack(self.data_list[index].split("|")[6:9])])
+        x = plt.imread(img_path)
         q = torch.tensor(x[...,:3]).permute(2,0,1)
 
-        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz').replace("image", "bboxes"))
-        # same_scene_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*|0.png').replace("objects", "image"))
-        same_scene_obj = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz'))
+        q_loc = joblib.load(self.data_list[index])
         q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
-        q_bbox_loc = np.array(q_loc['bbox_locations'])
-        q_bbox_category = np.array(q_loc['bbox_categories'])
+        # q_bbox_loc = np.array(q_loc['bbox_locations'])
+        # q_bbox_category = np.array(q_loc['bbox_categories'])
         q_loc = torch.tensor([0] + list(q_bbox[0]))
-        while True:
-            idx = np.random.randint(len(same_scene_obj))
-            if same_scene_obj[idx] == self.data_list[index]:
-                continue
-            k_loc = joblib.load(same_scene_obj[idx])
-            k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
-            k_bbox_loc = np.array(k_loc['bbox_locations'])
-            k_bbox_category = np.array(k_loc['bbox_categories'])
-            idx_a = np.where(np.all(k_bbox_loc == q_bbox_loc, -1))[0]
-            idx_c = np.where(k_bbox_category == q_bbox_category)[0]
-            same_idx = np.intersect1d(idx_a, idx_c)
-            if len(same_idx) > 0:
-                idxx = np.random.randint(len(same_idx))
-                same_idx= same_idx[idxx]
-                k_bbox = k_bbox[same_idx]
-                image_name = "|".join(same_scene_obj[idx].split("/")[-1].split("|")[:-1])
-                break
 
-        x_aug = plt.imread(os.path.join("/".join(self.data_list[index].split("/")[:-1]).replace("objects","image"), image_name+ ".png"))
+        same_scene_obj = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz'))
+        same_scene_obj_loc = np.stack([[float(j) for j in np.stack(i.split("|")[6:9])] for i in same_scene_obj])
+        dist = ((same_scene_obj_loc - obj_loc[None])**2).sum(-1)**0.5
+        category = np.array([i.split("|")[5] for i in same_scene_obj])
+        same_objs = np.where((dist == 0) & (category == obj_cat))[0]
+        randi = random.randint(0, len(same_objs)-1)
+        same_idx = same_objs[randi]
+        k_loc = joblib.load(same_scene_obj[same_idx])
+        k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
+        object_path = same_scene_obj[same_idx]
+        same_img_path = "|".join(object_path.split("|")[:-7]).replace("objects", "image") + ".png"
+        x_aug = plt.imread(same_img_path)
         k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
-        k_bbox = np.array(k_bbox).reshape(-1, 4)
         k_bbox = self.reduce_half(k_bbox)
-        input_width = (k_bbox[:, 2] - k_bbox[:, 0])
-        input_height = (k_bbox[:, 3] - k_bbox[:, 1])
-
-        k_bbox = self.add_bbox_noise(k_bbox, noise_amount=0.01, input_height=input_height, input_width=input_width)
+        k_bbox = self.add_bbox_noise(k_bbox, noise_amount=0.01, input_height=(k_bbox[:, 3] - k_bbox[:, 1]), input_width=(k_bbox[:, 2] - k_bbox[:, 0]))
         k_loc = torch.tensor([0] + list(k_bbox[0]))
         return [q, k], [q_loc, k_loc], index
 
