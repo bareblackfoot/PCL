@@ -673,8 +673,6 @@ class AI2ThorObjectDataset(data.Dataset):
 
         q_loc = joblib.load(self.data_list[index])
         q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
-        # q_bbox_loc = np.array(q_loc['bbox_locations'])
-        # q_bbox_category = np.array(q_loc['bbox_categories'])
         q_loc = torch.tensor([0] + list(q_bbox[0]))
 
         same_scene_obj = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz'))
@@ -696,7 +694,6 @@ class AI2ThorObjectDataset(data.Dataset):
         return [q, k], [q_loc, k_loc], index
 
 
-
 class AI2ThorObjectEvalDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
@@ -710,10 +707,20 @@ class AI2ThorObjectEvalDataset(data.Dataset):
         return len(self.data_list)
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])
+        img_path = "|".join(self.data_list[index].split("|")[:-7]).replace("objects", "image") + ".png"
+        # obj_cat = self.data_list[index].split("|")[5]
+        # obj_loc = np.stack([float(j) for j in np.stack(self.data_list[index].split("|")[6:9])])
+        x = plt.imread(img_path)
         q = torch.tensor(x[...,:3]).permute(2,0,1)
-        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz').replace("image", "bboxes"))
-        bbox_idx = np.random.randint(len(q_loc))
-        q_bbox = np.array(q_loc['bboxes'][bbox_idx]).reshape(-1, 4)
+
+        q_loc = joblib.load(self.data_list[index])
+        q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
         q_loc = torch.tensor([0] + list(q_bbox[0]))
+
+        # x = plt.imread(self.data_list[index])
+        # q = torch.tensor(x[...,:3]).permute(2,0,1)
+        # q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz').replace("image", "bboxes"))
+        # bbox_idx = np.random.randint(len(q_loc))
+        # q_bbox = np.array(q_loc['bboxes'][bbox_idx]).reshape(-1, 4)
+        # q_loc = torch.tensor([0] + list(q_bbox[0]))
         return q, q_loc, index
