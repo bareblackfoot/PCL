@@ -281,7 +281,7 @@ def main_worker(gpu, ngpus_per_node, args):
             bb = aa.copy()
             for path_name in aa:
                 obj_size = float(path_name.split("|")[-1].split(".dat.gz")[0])
-                if obj_size < 0.01:
+                if obj_size < 0.1:
                     bb.remove(path_name)
             all_train_data_list.extend(bb)
         # if len(all_train_data_list)>0:
