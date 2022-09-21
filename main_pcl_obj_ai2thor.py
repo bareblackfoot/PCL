@@ -316,7 +316,6 @@ def main_worker(gpu, ngpus_per_node, args):
         sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
 
     for epoch in range(args.start_epoch, args.epochs):
-
         cluster_result = None
         if epoch>=args.warmup_epoch:
             # compute momentum features for center-cropped images
@@ -395,7 +394,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         # ProtoNCE loss
         if output_proto is not None:
             loss_proto = 0
-            for proto_out,proto_target in zip(output_proto, target_proto):
+            for proto_out, proto_target in zip(output_proto, target_proto):
                 loss_proto += criterion(proto_out, proto_target)  
                 accp = accuracy(proto_out, proto_target)[0] 
                 acc_proto.update(accp[0], images[0].size(0))

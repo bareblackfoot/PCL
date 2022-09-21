@@ -259,7 +259,7 @@ def main_worker(gpu, ngpus_per_node, args):
             transforms.RandomApply([
                 transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
             ], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
+            # transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
@@ -268,7 +268,7 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
         augmentation = [
-            transforms.RandomGrayscale(p=0.2),
+            # transforms.RandomGrayscale(p=0.2),
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
@@ -326,7 +326,6 @@ def main_worker(gpu, ngpus_per_node, args):
         sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
     
     for epoch in range(args.start_epoch, args.epochs):
-        
         cluster_result = None
         if epoch>=args.warmup_epoch:
             # compute momentum features for center-cropped images
@@ -394,22 +393,22 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
             images[2] = images[2].cuda(args.gpu, non_blocking=True)
-            scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
-            if epoch < args.warmup_epoch:
-                scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
+            # scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
+            # if epoch < args.warmup_epoch:
+            #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
                 
         # compute output
-        output, target,  output_adv, target_adv, output_proto, target_proto = model(im_q=images[0], im_k=images[1], im_n=images[2], cluster_result=cluster_result, index=index)
+        output, target, output_proto, target_proto = model(im_q=images[0], im_k=images[1], cluster_result=cluster_result, index=index) # im_n=images[2], output_adv, target_adv,
         
         # InfoNCE loss
         loss = criterion(output, target)  
 
         # Adversarial loss
-        loss_adv = -0.1 * criterion(output_adv, target_adv)
+        # loss_adv = -0.1 * criterion(output_adv, target_adv)
 
         # Scene loss
         # loss_scene = torch.clip(1.0-0.1 * criterion(feat, scene_idx), 0.0)
-        loss += loss_adv
+        # loss += loss_adv
 
         # ProtoNCE loss
         if output_proto is not None:
