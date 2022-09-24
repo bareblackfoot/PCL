@@ -536,17 +536,18 @@ class HabitatSemDataset(data.Dataset):
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        semantic_img = self.augment(semantic_img)
+        x_aug_sem = self.augment(semantic_img)
         if self.base_transform is not None:
             q = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
-            # k = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
-            k = self.base_transform(Image.fromarray((sp_sem*255.).astype(np.uint8)))
+            k1 = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
+            k2 = self.base_transform(Image.fromarray((sp_sem*255.).astype(np.uint8)))
             # n = self.base_transform(Image.fromarray((n_sem_img*255.).astype(np.uint8)))
         else:
             q = torch.tensor(semantic_img).permute(2,0,1).float()
-            k = torch.tensor(sp_sem).permute(2,0,1).float()
+            k1 = torch.tensor(x_aug_sem).permute(2,0,1).float()
+            k2 = torch.tensor(sp_sem).permute(2,0,1).float()
             # n = torch.tensor(n_sem_img).permute(2,0,1).float()
-        return [q, k], index
+        return [q, k1, k2], index
 
 
 class HabitatSemEvalDataset(data.Dataset):
