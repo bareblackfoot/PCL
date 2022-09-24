@@ -97,8 +97,8 @@ parser.add_argument('--aug-plus', action='store_true',
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
-# parser.add_argument('--num-cluster', default='25000,50000,100000', type=str,
-parser.add_argument('--num-cluster', default='1000,2000,4000', type=str,
+parser.add_argument('--num-cluster', default='25000,50000,100000', type=str,
+# parser.add_argument('--num-cluster', default='1000,2000,4000', type=str,
                     help='number of clusters')
 parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
@@ -302,7 +302,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train_data_list,
         eval_augmentation,
         args.noisydepth)
-    
+    print(len(train_data_list))
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
