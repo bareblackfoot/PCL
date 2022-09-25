@@ -24,7 +24,7 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 import pcl.loader
-import pcl.builder
+import pcl.builder_sem
 import glob
 
 model_names = sorted(name for name in models.__dict__
@@ -183,7 +183,7 @@ def main_worker(gpu, ngpus_per_node, args):
     #         resnet18,
     #         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     # else:
-    model = pcl.builder.MoCo(
+    model = pcl.builder_sem.MoCo(
         models.__dict__[args.arch],
         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
     # model = pcl.builder.MoCo(
@@ -386,16 +386,20 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         if args.gpu is not None:
             images[0] = images[0].cuda(args.gpu, non_blocking=True)
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
-            # images[2] = images[2].cuda(args.gpu, non_blocking=True)
+            images[2] = images[2].cuda(args.gpu, non_blocking=True)
             # scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
-                
+
         # compute output
-        output, target, output_proto, target_proto = model(im_q=images[0], im_k=images[1], cluster_result=cluster_result, index=index) # im_n=images[2], output_adv, target_adv,
-        
+        output, target, output_soft, target_soft, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2], cluster_result=cluster_result, index=index)  # im_n=images[2], output_adv, target_adv,
+
         # InfoNCE loss
-        loss = criterion(output, target)  
+        loss = criterion(output, target)
+
+        # Soft InfoNCE loss
+        loss_soft = criterion(output_soft, target_soft)
+        loss += loss_soft
 
         # Adversarial loss
         # loss_adv = -0.1 * criterion(output_adv, target_adv)

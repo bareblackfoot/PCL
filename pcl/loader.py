@@ -513,6 +513,14 @@ class HabitatSemDataset(data.Dataset):
         return augmented_sem
 
     def pull_image(self, index):
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        semantic_img = Image.new(
+            "P", (x_sem.shape[1], x_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
+        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+
         place = self.data_list[index].split("/")[-2]
         same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == place]
         if len(same_place_list) > 1:
@@ -527,16 +535,8 @@ class HabitatSemDataset(data.Dataset):
         sp_sem.putpalette(d3_40_colors_rgb.flatten())
         sp_sem.putdata((sp_sem_.flatten() % 40).astype(np.uint8))
         sp_sem = np.array(sp_sem.convert("RGBA"))[...,:3]/255.
-        sp_sem = self.augment(sp_sem)
+        x_aug_sem = self.augment(sp_sem)
 
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
-        semantic_img = Image.new(
-            "P", (x_sem.shape[1], x_sem.shape[0])
-        )
-        semantic_img.putpalette(d3_40_colors_rgb.flatten())
-        semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        x_aug_sem = self.augment(semantic_img)
         if self.base_transform is not None:
             q = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
             k1 = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
@@ -604,6 +604,15 @@ class HabitatSemObjwiseDataset(data.Dataset):
         return augmented_sem
 
     def pull_image(self, index):
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        semantic_img = Image.new(
+            "P", (x_sem.shape[1], x_sem.shape[0])
+        )
+        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
+        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        semantic_img = self.augment(semantic_img)
+
         common_obj = self.data_list[index].split("/")[-2]
         same_place_list = self.same_place_dict[common_obj].copy()
         if len(same_place_list) > 1:
@@ -618,26 +627,19 @@ class HabitatSemObjwiseDataset(data.Dataset):
         sp_sem.putpalette(d3_40_colors_rgb.flatten())
         sp_sem.putdata((sp_sem_.flatten() % 40).astype(np.uint8))
         sp_sem = np.array(sp_sem.convert("RGBA"))[...,:3]/255.
-        sp_sem = self.augment(sp_sem)
+        x_aug_sem = self.augment(sp_sem)
 
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
-        semantic_img = Image.new(
-            "P", (x_sem.shape[1], x_sem.shape[0])
-        )
-        semantic_img.putpalette(d3_40_colors_rgb.flatten())
-        semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        semantic_img = self.augment(semantic_img)
         if self.base_transform is not None:
             q = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
-            # k = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
-            k = self.base_transform(Image.fromarray((sp_sem*255.).astype(np.uint8)))
+            k1 = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
+            k2 = self.base_transform(Image.fromarray((sp_sem*255.).astype(np.uint8)))
             # n = self.base_transform(Image.fromarray((n_sem_img*255.).astype(np.uint8)))
         else:
             q = torch.tensor(semantic_img).permute(2,0,1).float()
-            k = torch.tensor(sp_sem).permute(2,0,1).float()
+            k1 = torch.tensor(x_aug_sem).permute(2,0,1).float()
+            k2 = torch.tensor(sp_sem).permute(2,0,1).float()
             # n = torch.tensor(n_sem_img).permute(2,0,1).float()
-        return [q, k], index
+        return [q, k1, k2], index
 
 
 class HabitatSemObjwiseEvalDataset(data.Dataset):

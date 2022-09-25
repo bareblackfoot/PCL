@@ -390,9 +390,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         data_time.update(time.time() - end)
 
         if args.gpu is not None:
-            images[0] = images[0].cuda(args.gpu, non_blocking=True)
-            images[1] = images[1].cuda(args.gpu, non_blocking=True)
-            images[2] = images[2].cuda(args.gpu, non_blocking=True)
+            images[0] = images[0].cuda(args.gpu, non_blocking=True) # q
+            images[1] = images[1].cuda(args.gpu, non_blocking=True) #k1
+            images[2] = images[2].cuda(args.gpu, non_blocking=True) #k2
             # scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
