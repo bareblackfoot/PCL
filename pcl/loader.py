@@ -7,7 +7,57 @@ import numpy as np
 import torch
 import joblib, glob, os, cv2
 from PIL import Image
-from habitat_sim.utils.common import d3_40_colors_rgb
+# from habitat_sim.utils.common import d3_40_colors_rgb
+with open(os.path.join(os.path.dirname(__file__), "data/matterport_category.txt"), "r") as f:
+    lines = f.readlines()
+CATEGORIES = {}
+CATEGORIES['mp3d'] = [line.rstrip() for line in lines]
+
+d3_40_colors_rgb: np.ndarray = np.array(
+    [
+        [31, 119, 180],
+        [174, 199, 232],
+        [255, 127, 14],
+        [255, 187, 120],
+        [44, 160, 44],
+        [152, 223, 138],
+        [214, 39, 40],
+        [255, 152, 150],
+        [148, 103, 189],
+        [197, 176, 213],
+        [140, 86, 75],
+        [196, 156, 148],
+        [227, 119, 194],
+        [247, 182, 210],
+        [127, 127, 127],
+        [199, 199, 199],
+        [188, 189, 34],
+        [219, 219, 141],
+        [23, 190, 207],
+        [158, 218, 229],
+        [57, 59, 121],
+        [82, 84, 163],
+        [107, 110, 207],
+        [156, 158, 222],
+        [99, 121, 57],
+        [140, 162, 82],
+        [181, 207, 107],
+        [206, 219, 156],
+        [140, 109, 49],
+        [189, 158, 57],
+        [231, 186, 82],
+        [231, 203, 148],
+        [132, 60, 57],
+        [173, 73, 74],
+        [214, 97, 107],
+        [231, 150, 156],
+        [123, 65, 115],
+        [165, 81, 148],
+        [206, 109, 189],
+        [222, 158, 214],
+    ],
+    dtype=np.uint8,
+)
 
 
 class TwoCropsTransform:
@@ -322,7 +372,6 @@ class HabitatImageSemDataset(data.Dataset):
         n_sem = Image.new(
             "P", (n_sem_.shape[1], n_sem_.shape[0])
         )
-        # from habitat_sim.utils.common import d3_40_colors_rgb
         n_sem.putpalette(d3_40_colors_rgb.flatten())
         n_sem.putdata((n_sem_.flatten() % 40).astype(np.uint8))
         n_sem = np.array(n_sem.convert("RGBA"))[...,:3]/255.
@@ -382,7 +431,6 @@ class HabitatImageSemEvalDataset(data.Dataset):
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
-        from habitat_sim.utils.common import d3_40_colors_rgb
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
@@ -496,6 +544,15 @@ class HabitatSemDataset(data.Dataset):
         self.base_transform = base_transform
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
+        COI = ['chair', 'door', 'table', 'picture', 'cabinet', 'cushion', 'window', 'sofa',
+                   'bed', 'curtain', 'chest_of_drawers', 'plant', 'sink', 'stairs',  'toilet', 'stool', 'towel',
+                   'mirror', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace',
+                   'shelving', 'blinds', 'gym_equipment', 'seating', 'board', 'furniture', 'appliances', 'clothes', 'objects']
+        self.COI_INDEX = np.where([c in COI for c in CATEGORIES['mp3d']])[0]
+        self.d3_40_colors_rgb = d3_40_colors_rgb.copy()
+        for idx in range(40):
+            if idx not in self.COI_INDEX:
+                self.d3_40_colors_rgb[idx] = np.array([0,0,0])
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -517,7 +574,7 @@ class HabitatSemDataset(data.Dataset):
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
-        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putpalette(self.d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
 
@@ -532,7 +589,7 @@ class HabitatSemDataset(data.Dataset):
         sp_sem = Image.new(
             "P", (sp_sem_.shape[1], sp_sem_.shape[0])
         )
-        sp_sem.putpalette(d3_40_colors_rgb.flatten())
+        sp_sem.putpalette(self.d3_40_colors_rgb.flatten())
         sp_sem.putdata((sp_sem_.flatten() % 40).astype(np.uint8))
         sp_sem = np.array(sp_sem.convert("RGBA"))[...,:3]/255.
         x_aug_sem = self.augment(sp_sem)
@@ -588,6 +645,16 @@ class HabitatSemObjwiseDataset(data.Dataset):
         for object in objects:
             self.same_place_dict[object] = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == object]
 
+        COI = ['chair', 'door', 'table', 'picture', 'cabinet', 'cushion', 'window', 'sofa',
+                   'bed', 'curtain', 'chest_of_drawers', 'plant', 'sink', 'stairs',  'toilet', 'stool', 'towel',
+                   'mirror', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace',
+                   'shelving', 'blinds', 'gym_equipment', 'seating', 'board', 'furniture', 'appliances', 'clothes', 'objects']
+        self.COI_INDEX = np.where([c in COI for c in CATEGORIES['mp3d']])[0]
+        self.d3_40_colors_rgb = d3_40_colors_rgb.copy()
+        for idx in range(40):
+            if idx not in self.COI_INDEX:
+                self.d3_40_colors_rgb[idx] = np.array([0,0,0])
+
     def __getitem__(self, index):
         return self.pull_image(index)
 
@@ -608,7 +675,7 @@ class HabitatSemObjwiseDataset(data.Dataset):
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
-        semantic_img.putpalette(d3_40_colors_rgb.flatten())
+        semantic_img.putpalette(self.d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
         semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
         semantic_img = self.augment(semantic_img)
@@ -624,7 +691,7 @@ class HabitatSemObjwiseDataset(data.Dataset):
         sp_sem = Image.new(
             "P", (sp_sem_.shape[1], sp_sem_.shape[0])
         )
-        sp_sem.putpalette(d3_40_colors_rgb.flatten())
+        sp_sem.putpalette(self.d3_40_colors_rgb.flatten())
         sp_sem.putdata((sp_sem_.flatten() % 40).astype(np.uint8))
         sp_sem = np.array(sp_sem.convert("RGBA"))[...,:3]/255.
         x_aug_sem = self.augment(sp_sem)
