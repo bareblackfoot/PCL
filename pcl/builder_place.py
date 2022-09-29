@@ -29,10 +29,10 @@ class MoCo(nn.Module):
         self.encoder_k = base_encoder(num_classes=dim)
         # self.logit_scene_fc = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, 25))
 
-        if mlp:  # hack: brute-force replacement
-            dim_mlp = self.encoder_q.fc.weight.shape[1]
-            self.encoder_q.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_q.fc)
-            self.encoder_k.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_k.fc)
+        # if mlp:  # hack: brute-force replacement
+        #     dim_mlp = self.encoder_q.fc.weight.shape[1]
+        #     self.encoder_q.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_q.fc)
+        #     self.encoder_k.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.encoder_k.fc)
 
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
@@ -40,7 +40,6 @@ class MoCo(nn.Module):
 
         # create the queue
         self.register_buffer("queue", torch.randn(dim, r))
-        # self.register_buffer("queue_l", torch.zeros(r, dtype=torch.long))
         self.queue = nn.functional.normalize(self.queue, dim=0)
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
@@ -72,7 +71,7 @@ class MoCo(nn.Module):
         self.queue_ptr[0] = ptr
 
     @torch.no_grad()
-    def _batch_shuffle_ddp(self, x, x_obj):
+    def _batch_shuffle_ddp(self, x, x_obj, x_obj_cat):
         """
         Batch shuffle, for making use of BatchNorm.
         *** Only support DistributedDataParallel (DDP) model. ***
@@ -81,6 +80,7 @@ class MoCo(nn.Module):
         batch_size_this = x.shape[0]
         x_gather = concat_all_gather(x)
         x_obj_gather = concat_all_gather(x_obj)
+        x_obj_cat_gather = concat_all_gather(x_obj_cat)
         batch_size_all = x_gather.shape[0]
 
         num_gpus = batch_size_all // batch_size_this
@@ -98,7 +98,7 @@ class MoCo(nn.Module):
         gpu_idx = torch.distributed.get_rank()
         idx_this = idx_shuffle.view(num_gpus, -1)[gpu_idx]
 
-        return x_gather[idx_this], x_obj_gather[idx_this], idx_unshuffle
+        return x_gather[idx_this], x_obj_gather[idx_this], x_obj_cat_gather[idx_this], idx_unshuffle
 
     @torch.no_grad()
     def _batch_unshuffle_ddp(self, x, idx_unshuffle):
@@ -119,7 +119,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, obj_q, im_soft=None, im_k=None, obj_soft=None, obj_k=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, im_q, obj_q, cat_q, im_soft=None, im_k=None, obj_soft=None, obj_k=None, cat_k=None, cat_soft=None, is_eval=False, cluster_result=None, index=None):
         """
         Input:
             im_q: a batch of query images
@@ -132,7 +132,7 @@ class MoCo(nn.Module):
         """
         
         if is_eval:
-            k = self.encoder_k(im_q, obj_q)
+            k = self.encoder_k(im_q, obj_q, cat_q)
             k = nn.functional.normalize(k, dim=1)            
             return k
         
@@ -141,16 +141,16 @@ class MoCo(nn.Module):
             self._momentum_update_key_encoder()  # update the key encoder
 
             # shuffle for making use of BN
-            im_k, obj_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
+            im_k, obj_k, cat_k, idx_unshuffle = self._batch_shuffle_ddp(im_k, obj_k, cat_k)
 
-            k = self.encoder_k(im_k, obj_k)  # keys: NxC
+            k = self.encoder_k(im_k, obj_k, cat_k)  # keys: NxC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
         # compute negative features
-        q_soft = self.encoder_q(im_soft, obj_soft)  # queries: NxC
+        q_soft = self.encoder_q(im_soft, obj_soft, cat_soft)  # queries: NxC
         q_soft = nn.functional.normalize(q_soft, dim=1)
         l_pos_soft = torch.einsum('nc,nc->n', [q_soft, k]).unsqueeze(-1)
         l_neg_soft = torch.einsum('nc,ck->nk', [q_soft,  self.queue.clone().detach()])
@@ -165,7 +165,7 @@ class MoCo(nn.Module):
         labels_soft = torch.zeros(logits_soft.shape[0], dtype=torch.long).cuda()
 
         # compute query features
-        q = self.encoder_q(im_q, obj_q)  # queries: NxC
+        q = self.encoder_q(im_q, obj_q, cat_q)  # queries: NxC
         # logit_scene = None
         # logit_scene = self.logit_scene_fc(q)
         q = nn.functional.normalize(q, dim=1)

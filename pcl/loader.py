@@ -1021,6 +1021,14 @@ class HabitatRGBObjDataset(data.Dataset):
                 bbox[0] -= a/width
                 bbox[2] -= a/width
         obj['bboxes'] = bboxes
+        # bboxes = obj['bboxes']
+        # bbox_category = obj['bbox_categories']
+        # for i, bbox in enumerate(bboxes):
+        #     label = CATEGORIES['mp3d'][bbox_category[i]]
+        #     imgHeight, imgWidth, _ = rgb_roted.shape
+        #     cv2.rectangle(rgb_roted, (int(bbox[0]*imgWidth), int(bbox[1]*imgHeight)), (int(bbox[2]*imgWidth), int(bbox[3]*imgHeight)), [255,255,0], 1)
+        #     if len(bbox_category) > 0:
+        #         cv2.putText(rgb_roted, label, (int(bbox[0]*imgWidth), int(bbox[1]*imgHeight) + 10), 0, 5e-3 * imgHeight, (183, 115, 48), 1)
         return rgb_roted, obj
 
     def pull_image(self, index):
@@ -1037,7 +1045,7 @@ class HabitatRGBObjDataset(data.Dataset):
             same_place_list.remove(self.data_list[index])
         idx = np.random.randint(len(same_place_list))
         sp_sample = same_place_list[idx]
-        sp = plt.imread(sp_sample)
+        sp = plt.imread(sp_sample)[...,:3]
         sp_obj = joblib.load(sp_sample.replace('_rgb.png', '.dat.gz').replace('image', 'object'))
         sp_obj_out = np.zeros((self.max_object, 4))
         sp_obj_category_out = np.zeros((self.max_object))

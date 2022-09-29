@@ -7,6 +7,8 @@ try:
 except ImportError:
     from torch.utils.model_zoo import load_url as load_state_dict_from_url  # noqa: 401
 from torchvision.ops import roi_align
+from graph_layer import GraphConvolution
+import torch.nn.functional as F
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -25,6 +27,34 @@ model_urls = {
     'wide_resnet50_2': 'https://download.pytorch.org/models/wide_resnet50_2-95faca4d.pth',
     'wide_resnet101_2': 'https://download.pytorch.org/models/wide_resnet101_2-32ee1156.pth',
 }
+
+
+class ObjGCN(nn.Module):
+    def __init__(self, feat_dim, dropout=0.1, hidden_dim=4, init='xavier'):
+        super(ObjGCN, self).__init__()
+        self.gc_obj1 = GraphConvolution(feat_dim, hidden_dim, init=init)
+        self.gc_obj2 = GraphConvolution(hidden_dim, hidden_dim, init=init)
+        self.obj_out = nn.Linear(hidden_dim, feat_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, obj_memory, obj_adj):
+        BO, NO = obj_memory.shape[0], obj_memory.shape[1]
+
+        # construct big version of graph
+        with torch.no_grad():
+            big_obj_graph = torch.cat([graph for graph in obj_memory], 0)
+            big_obj_adj = torch.zeros(BO * NO, BO * NO).to(obj_memory.device)
+            for b in range(BO):
+                big_obj_adj[b * NO:(b + 1) * NO, b * NO:(b + 1) * NO] = obj_adj[b]
+
+        # graph convolution on objects
+        big_obj_graph = self.dropout(F.relu(self.gc_obj1(big_obj_graph, big_obj_adj)))
+        big_obj_graph = self.dropout(F.relu(self.gc_obj2(big_obj_graph, big_obj_adj)))
+        big_obj_output = torch.stack(big_obj_graph.split(NO))
+        big_obj_output = self.obj_out(big_obj_output)
+
+        return big_obj_output
+
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -156,12 +186,18 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
                                        dilate=replace_stride_with_dilation[0])
-        # self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
-        #                                dilate=replace_stride_with_dilation[1])
-        # self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-        #                                dilate=replace_stride_with_dilation[2])
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
+                                       dilate=replace_stride_with_dilation[1])
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
+                                       dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(128 * block.expansion, num_classes)
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc_obj = nn.Linear(128 * block.expansion, num_classes)
+        self.obj_gcn = ObjGCN(128)
+        self.cat_embed = nn.Embedding(41, 128)
+        self.concat_cat = nn.Linear(128 * 2, 128)
+        self.concat = nn.Linear(128 * block.expansion + 128, num_classes)
+        self.obj_cat = nn.Linear(128 * 10, 128)
         # self.object_compression = nn.Sequential(
         #     nn.Linear(128 * 7 * 7, 32 * 2),
         #     nn.ReLU(),
@@ -227,11 +263,9 @@ class ResNet(nn.Module):
 
         return x_, x
 
-    # def forward(self, x):
-    #     return self._forward_impl(x)[1]
-
-    def forward(self, x, rois):
+    def forward(self, x, rois, rois_category):
         B, C, H, W = x.shape
+        _, NO, _ = rois.shape
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -246,20 +280,26 @@ class ResNet(nn.Module):
         x = torch.flatten(x, 1)
         x_im = self.fc(x)
         rois_new = rois.clone()
+        if rois.shape[-1] == 4:
+            rois_new = torch.cat([torch.zeros_like(rois_new[..., :1]), rois_new], dim=-1).float()
         if rois.max() <= 1.:
-            rois_new[:, 1] = rois[:, 1] * W
-            rois_new[:, 2] = rois[:, 2] * H
-            rois_new[:, 3] = rois[:, 3] * W
-            rois_new[:, 4] = rois[:, 4] * H
+            rois_new[..., 1] = rois_new[..., 1] * W
+            rois_new[..., 2] = rois_new[..., 2] * H
+            rois_new[..., 3] = rois_new[..., 3] * W
+            rois_new[..., 4] = rois_new[..., 4] * H
         for i in range(len(rois_new)):
-            rois_new[i, 0] = i
-        x = roi_align(x_inter, rois_new, (7, 7), 1.0/(2**3), aligned=True)#.reshape(B, -1)
+            rois_new[i, :, 0] = i
+        x_obj = roi_align(x_inter, rois_new.reshape(-1, 5), (7, 7), 1.0/(2**3), aligned=True)
         # x = self.object_compression(x)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-        x = self.concat(torch.cat([x_im , x]))
-        return x
+        x_obj = self.avgpool(x_obj)
+        x_obj = torch.flatten(x_obj, 1)
+        x_obj = self.fc_obj(x_obj)
+        obj_category = self.cat_embed(rois_category.long())
+        x_obj = self.concat_cat(torch.cat([x_obj.reshape(B, NO, -1), obj_category], -1))
+        x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1]]))
+        x_obj = self.obj_cat(x_obj.flatten(1))
+        x_combined = self.concat(torch.cat([x_im , x_obj], -1))
+        return x_combined
 
 
 def _resnet(arch, block, layers, pretrained, progress, **kwargs):

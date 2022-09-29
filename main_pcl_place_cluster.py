@@ -196,12 +196,12 @@ def main_worker(gpu, ngpus_per_node, args):
             # ourselves based on the total number of GPUs we have
             args.batch_size = int(args.batch_size / ngpus_per_node)
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         else:
             model.cuda()
             # DistributedDataParallel will divide and allocate batch_size to all
             # available GPUs if device_ids are not set
-            model = torch.nn.parallel.DistributedDataParallel(model)
+            model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
     elif args.gpu is not None:
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
@@ -373,7 +373,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
     model.train()
 
     end = time.time()
-    for i, (images, objects, index) in enumerate(train_loader):
+    for i, (images, objects, object_categories, index) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -384,6 +384,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             objects[0] = objects[0].cuda(args.gpu, non_blocking=True) # q
             objects[1] = objects[1].cuda(args.gpu, non_blocking=True) #k1
             objects[2] = objects[2].cuda(args.gpu, non_blocking=True) #k2
+            object_categories[0] = object_categories[0].cuda(args.gpu, non_blocking=True) # q
+            object_categories[1] = object_categories[1].cuda(args.gpu, non_blocking=True) #k1
+            object_categories[2] = object_categories[2].cuda(args.gpu, non_blocking=True) #k2
             # scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
@@ -391,6 +394,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         # compute output
         output, target, output_soft, target_soft, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2],
                                                                                      obj_q=objects[0], obj_soft=objects[1], obj_k=objects[2],
+                                                                                     cat_q=object_categories[0], cat_soft=object_categories[1], cat_k=object_categories[2],
                                                                                      cluster_result=cluster_result, index=index) # im_n=images[2], output_adv, target_adv,
         
         # InfoNCE loss
