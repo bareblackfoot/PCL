@@ -1088,8 +1088,14 @@ class HabitatRGBObjEvalDataset(data.Dataset):
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
         x_obj = joblib.load(self.data_list[index].replace('.png', '.dat.gz').replace('image', 'object'))
+
+        x_obj_out = np.zeros((self.max_object, 4))
+        x_obj_category_out = np.zeros((self.max_object))
+        x_obj_out[:len(x_obj['bboxes'])] = x_obj['bboxes'][:self.max_object]
+        x_obj_category_out[:len(x_obj['bbox_categories'])] = x_obj['bbox_categories'][:self.max_object]
+
         if self.base_transform is not None:
             q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
         else:
             q = torch.tensor(x).permute(2,0,1).float()
-        return q, x_obj, scene_idx
+        return q, x_obj_out, x_obj_category_out, scene_idx

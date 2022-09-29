@@ -41,11 +41,11 @@ class ObjGCN(nn.Module):
         BO, NO = obj_memory.shape[0], obj_memory.shape[1]
 
         # construct big version of graph
-        with torch.no_grad():
-            big_obj_graph = torch.cat([graph for graph in obj_memory], 0)
-            big_obj_adj = torch.zeros(BO * NO, BO * NO).to(obj_memory.device)
-            for b in range(BO):
-                big_obj_adj[b * NO:(b + 1) * NO, b * NO:(b + 1) * NO] = obj_adj[b]
+        # with torch.no_grad():
+        big_obj_graph = torch.cat([graph for graph in obj_memory], 0)
+        big_obj_adj = torch.zeros(BO * NO, BO * NO).to(obj_memory.device)
+        for b in range(BO):
+            big_obj_adj[b * NO:(b + 1) * NO, b * NO:(b + 1) * NO] = obj_adj[b]
 
         # graph convolution on objects
         big_obj_graph = self.dropout(F.relu(self.gc_obj1(big_obj_graph, big_obj_adj)))
@@ -294,9 +294,9 @@ class ResNet(nn.Module):
         x_obj = self.avgpool(x_obj)
         x_obj = torch.flatten(x_obj, 1)
         x_obj = self.fc_obj(x_obj)
-        obj_category = self.cat_embed(rois_category.long())
+        obj_category = self.cat_embed(rois_category)
         x_obj = self.concat_cat(torch.cat([x_obj.reshape(B, NO, -1), obj_category], -1))
-        x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1]]))
+        # x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1]]))
         x_obj = self.obj_cat(x_obj.flatten(1))
         x_combined = self.concat(torch.cat([x_im , x_obj], -1))
         return x_combined

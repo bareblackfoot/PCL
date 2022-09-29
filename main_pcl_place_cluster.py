@@ -182,7 +182,7 @@ def main_worker(gpu, ngpus_per_node, args):
         resnet18,
         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
 
-    print(model)
+    # print(model)
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -372,6 +372,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
     # switch to train mode
     model.train()
 
+
     end = time.time()
     for i, (images, objects, object_categories, index) in enumerate(train_loader):
         # measure data loading time
@@ -384,9 +385,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             objects[0] = objects[0].cuda(args.gpu, non_blocking=True) # q
             objects[1] = objects[1].cuda(args.gpu, non_blocking=True) #k1
             objects[2] = objects[2].cuda(args.gpu, non_blocking=True) #k2
-            object_categories[0] = object_categories[0].cuda(args.gpu, non_blocking=True) # q
-            object_categories[1] = object_categories[1].cuda(args.gpu, non_blocking=True) #k1
-            object_categories[2] = object_categories[2].cuda(args.gpu, non_blocking=True) #k2
+            object_categories[0] = object_categories[0].cuda(args.gpu, non_blocking=True).long() # q
+            object_categories[1] = object_categories[1].cuda(args.gpu, non_blocking=True).long() #k1
+            object_categories[2] = object_categories[2].cuda(args.gpu, non_blocking=True).long() #k2
             # scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
@@ -430,6 +431,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
+        # print("aa")
+        # for name, param in model.named_parameters():
+        #     if param.grad is None:
+        #         print(name)
         optimizer.step()
 
         # measure elapsed time
@@ -444,16 +449,17 @@ def compute_features(eval_loader, model, args):
     print('Computing features...')
     model.eval()
     features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
-    for i, (images, index, _) in enumerate(tqdm(eval_loader)):
+    for i, (images, objects, categories, index) in enumerate(tqdm(eval_loader)):
         with torch.no_grad():
             images = images.cuda(non_blocking=True)
-            feat = model(images,is_eval=True) 
+            objects = objects.cuda(non_blocking=True)
+            categories = categories.cuda(non_blocking=True)
+            feat = model(images,objects,categories,is_eval=True)
             features[index] = feat
     dist.barrier()        
     dist.all_reduce(features, op=dist.ReduceOp.SUM)     
     return features.cpu()
 
-    
 def run_kmeans(x, args):
     """
     Args:
