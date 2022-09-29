@@ -7,7 +7,7 @@ try:
 except ImportError:
     from torch.utils.model_zoo import load_url as load_state_dict_from_url  # noqa: 401
 from torchvision.ops import roi_align
-from graph_layer import GraphConvolution
+from graph_layer import BatGraphAttentionLayer, GatedSkipConnection
 import torch.nn.functional as F
 
 
@@ -30,30 +30,26 @@ model_urls = {
 
 
 class ObjGCN(nn.Module):
-    def __init__(self, feat_dim, dropout=0.1, hidden_dim=4, init='xavier'):
+    def __init__(self, feat_dim, dropout=0.1, hidden_dim=4, nheads=2, alpha=0.4, init='xavier'):
         super(ObjGCN, self).__init__()
-        self.gc_obj1 = GraphConvolution(feat_dim, hidden_dim, init=init)
-        self.gc_obj2 = GraphConvolution(hidden_dim, hidden_dim, init=init)
-        self.obj_out = nn.Linear(hidden_dim, feat_dim)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = dropout
+        self.attentions = [BatGraphAttentionLayer(feat_dim, hidden_dim, dropout=dropout, alpha=alpha, concat=True) for _ in range(nheads)]
+        for i, attention in enumerate(self.attentions):
+            self.add_module('attention_{}'.format(i), attention)
+        self.sc = GatedSkipConnection(feat_dim, hidden_dim * nheads)
+        self.out_att = BatGraphAttentionLayer(hidden_dim * nheads, hidden_dim, dropout=dropout, alpha=alpha, concat=False)
+        self.decode = nn.Linear(hidden_dim, feat_dim)
 
-    def forward(self, obj_memory, obj_adj):
-        BO, NO = obj_memory.shape[0], obj_memory.shape[1]
-
-        # construct big version of graph
-        # with torch.no_grad():
-        big_obj_graph = torch.cat([graph for graph in obj_memory], 0)
-        big_obj_adj = torch.zeros(BO * NO, BO * NO).to(obj_memory.device)
-        for b in range(BO):
-            big_obj_adj[b * NO:(b + 1) * NO, b * NO:(b + 1) * NO] = obj_adj[b]
-
-        # graph convolution on objects
-        big_obj_graph = self.dropout(F.relu(self.gc_obj1(big_obj_graph, big_obj_adj)))
-        big_obj_graph = self.dropout(F.relu(self.gc_obj2(big_obj_graph, big_obj_adj)))
-        big_obj_output = torch.stack(big_obj_graph.split(NO))
-        big_obj_output = self.obj_out(big_obj_output)
-
-        return big_obj_output
+    def forward(self, x, adj):
+        identity = x
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = torch.cat([att(x, adj) for att in self.attentions], dim=-1)
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = self.sc(identity, x)
+        x, e = self.out_att(x, adj)
+        x = self.decode(x)
+        x = F.elu(x)
+        return x
 
 
 
@@ -296,7 +292,7 @@ class ResNet(nn.Module):
         x_obj = self.fc_obj(x_obj)
         obj_category = self.cat_embed(rois_category)
         x_obj = self.concat_cat(torch.cat([x_obj.reshape(B, NO, -1), obj_category], -1))
-        # x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1]]))
+        x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1], x_obj.shape[1]]).cuda())
         x_obj = self.obj_cat(x_obj.flatten(1))
         x_combined = self.concat(torch.cat([x_im , x_obj], -1))
         return x_combined

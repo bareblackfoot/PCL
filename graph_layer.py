@@ -1,10 +1,11 @@
 import math
 import torch
-import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
+
 
 class GraphConvolution(Module):
     def __init__(self, in_features, out_features, bias=True, init='xavier'):
@@ -159,7 +160,6 @@ class GraphAttention(nn.Module):
         return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
 
 
-
 class SpecialSpmmFunction(torch.autograd.Function):
     """Special function for only sparse region backpropataion layer."""
 
@@ -187,3 +187,69 @@ class SpecialSpmmFunction(torch.autograd.Function):
 class SpecialSpmm(nn.Module):
     def forward(self, indices, values, shape, b):
         return SpecialSpmmFunction.apply(indices, values, shape, b)
+
+
+class GatedSkipConnection(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super(GatedSkipConnection, self).__init__()
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.linear = nn.Linear(in_dim, out_dim, bias=False)
+        self.linear_coef_in = nn.Linear(out_dim, out_dim)
+        self.linear_coef_out = nn.Linear(out_dim, out_dim)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, in_x, out_x):
+        if self.in_dim != self.out_dim:
+            in_x = self.linear(in_x)
+        z = self.gate_coefficient(in_x, out_x)
+        out = z * in_x + (1-z)*out_x
+        return out
+
+    def gate_coefficient(self, in_x, out_x):
+        x1 = self.linear_coef_in(in_x)
+        x2 = self.linear_coef_out(out_x)
+        return self.sigmoid(x1 + x2)
+
+
+class BatGraphAttentionLayer(nn.Module):
+    """
+    Simple GAT layer, similar to https://arxiv.org/abs/1710.10903
+    """
+
+    def __init__(self, in_features, out_features, dropout, alpha=0.4, concat=True):
+        super(BatGraphAttentionLayer, self).__init__()
+        self.dropout = dropout
+        self.in_features = in_features
+        self.out_features = out_features
+        self.alpha = alpha
+        self.concat = concat
+
+        self.W = nn.Linear(in_features, out_features)
+        nn.init.xavier_uniform_(self.W.weight, gain=1.414)
+        self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
+        nn.init.xavier_uniform_(self.a.data, gain=1.414)
+
+        self.leakyrelu = nn.LeakyReLU(self.alpha)
+
+    def forward(self, input, adj):
+        B = input.size()[0]
+        N = input.size()[1]
+        h = self.W(input)
+
+        a_input = torch.cat([h.unsqueeze(2).repeat(1,1,N,1), h.unsqueeze(1).repeat(1,N,1,1)], dim=-1)
+        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(-1))
+
+        zero_vec = -9e15*torch.ones_like(e)
+        attention = torch.where(adj > 0, e, zero_vec)
+        attention = F.softmax(attention, dim=-1)
+        attention = torch.where(torch.isnan(attention), Variable(torch.zeros_like(attention), requires_grad=False).cuda(), attention)
+        attention = F.dropout(attention, self.dropout, training=self.training)
+        h_prime = torch.matmul(attention, h)
+        if self.concat:
+            return F.elu(h_prime)
+        else:
+            return h_prime, attention
+
+    def __repr__(self):
+        return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
