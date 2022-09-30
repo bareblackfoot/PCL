@@ -1087,7 +1087,7 @@ class HabitatRGBObjEvalDataset(data.Dataset):
         x = plt.imread(self.data_list[index])
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
-        x_obj = joblib.load(self.data_list[index].replace('.png', '.dat.gz').replace('image', 'object'))
+        x_obj = joblib.load(self.data_list[index].replace('_rgb.png', '.dat.gz').replace('image', 'object'))
 
         x_obj_out = np.zeros((self.max_object, 4))
         x_obj_category_out = np.zeros((self.max_object))
