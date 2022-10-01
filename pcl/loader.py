@@ -1085,7 +1085,7 @@ class HabitatRGBObjEvalDataset(data.Dataset):
         return len(self.data_list)
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])
+        x = plt.imread(self.data_list[index])[...,:3]
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
         x_obj = joblib.load(self.data_list[index].replace('_rgb.png', '.dat.gz').replace('image', 'object'))
