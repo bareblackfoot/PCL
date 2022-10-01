@@ -1076,6 +1076,7 @@ class HabitatRGBObjEvalDataset(data.Dataset):
         self.base_transform = base_transform
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
+        self.max_object = 10
 
     def __getitem__(self, index):
         return self.pull_image(index)
