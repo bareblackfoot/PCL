@@ -453,7 +453,7 @@ def compute_features(eval_loader, model, args):
         with torch.no_grad():
             images = images.cuda(non_blocking=True)
             objects = objects.cuda(non_blocking=True)
-            categories = categories.cuda(non_blocking=True)
+            categories = categories.cuda(non_blocking=True).long()
             feat = model(images,objects,categories,is_eval=True)
             features[index] = feat
     dist.barrier()        
