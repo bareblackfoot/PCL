@@ -908,20 +908,27 @@ class HabitatObjectDataset(data.Dataset):
         x = plt.imread(self.data_list[index])[...,:3]
         same_obj_images = np.sort(glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png')))
         idx = np.random.randint(len(same_obj_images))
-        x_aug = plt.imread(same_obj_images[idx])[...,:3]
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
         q_bbox = np.array(q_loc['bbox']).reshape(-1, 4)
         # rgb_test = self.draw_bbox(x.copy(), q_bbox.copy(), [q_loc['bbox_category'].copy()])
         q_bbox = torch.tensor([0] + list(q_bbox[0]))
-        k_loc = joblib.load(same_obj_images[idx].replace(".png",".dat.gz"))
-        k_bbox = np.array(k_loc['bbox']).reshape(-1, 4)
-        k_bbox = self.reduce_half(k_bbox)
-        # input_width = (k_bbox[:, 2] - k_bbox[:, 0])
-        # input_height = (k_bbox[:, 3] - k_bbox[:, 1])
-        # k_bbox = self.add_bbox_noise(k_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
-        # rgb_test = self.draw_bbox(x_aug.copy(), k_bbox.copy(), [k_loc['bbox_category'].copy()])
-        k_bbox = torch.tensor([0] + list(k_bbox[0]))
+
+        if np.random.randint(3) == 0:
+            x_aug = x.copy()
+            k_loc = q_loc.copy()
+            k_bbox = np.array(k_loc['bbox']).reshape(-1, 4)
+            k_bbox = self.reduce_half(k_bbox)
+            input_width = (k_bbox[:, 2] - k_bbox[:, 0])
+            input_height = (k_bbox[:, 3] - k_bbox[:, 1])
+            k_bbox = self.add_bbox_noise(k_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
+            k_bbox = torch.tensor([0] + list(k_bbox[0]))
+        else:
+            x_aug = plt.imread(same_obj_images[idx])[...,:3]
+            k_loc = joblib.load(same_obj_images[idx].replace(".png",".dat.gz"))
+            k_bbox = np.array(k_loc['bbox']).reshape(-1, 4)
+            k_bbox = self.reduce_half(k_bbox)
+            k_bbox = torch.tensor([0] + list(k_bbox[0]))
 
         if self.base_transform is not None:
             q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
