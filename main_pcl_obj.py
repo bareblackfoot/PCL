@@ -273,6 +273,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
     data_dir = args.data_dir #
     train_data_list = glob.glob(f"{data_dir}/*/*/*.png")
+    # bbox_list = glob.glob(f"{data_dir}/*/*/*.dat.gz")
     train_dataset = pcl.loader.HabitatObjectDataset(
         train_data_list,
         transforms.Compose(augmentation),
