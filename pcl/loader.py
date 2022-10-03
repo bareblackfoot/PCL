@@ -742,26 +742,6 @@ class HabitatSemObjwiseEvalDataset(data.Dataset):
         q = torch.tensor(semantic_img).permute(2,0,1).float()
         return q, index, scene_idx
 
-class HabitatObjectEvalDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None, noisydepth=False):
-        self.data_list = data_list
-        self.base_transform = base_transform
-        self.noisydepth = noisydepth
-
-    def __getitem__(self, index):
-        return self.pull_image(index)
-
-    def __len__(self):
-        return len(self.data_list)
-
-    def pull_image(self, index):
-        x = plt.imread(self.data_list[index])
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
-
-        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
-        q_loc = torch.tensor([0] + list(q_loc['bboxes']))
-        return q, q_loc, index
-
 class AI2thorImageDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
@@ -838,6 +818,43 @@ class AI2thorImageEvalDataset(data.Dataset):
         if self.noisydepth:
             q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
         return q, index
+
+
+class HabitatObjectEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, noisydepth=False):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.noisydepth = noisydepth
+        self.dataset = "mp3d"
+        if "mp3d" in self.data_list[0]:
+            self.dataset = "mp3d"
+        elif "gibson" in self.data_list[0]:
+            self.dataset = "gibson"
+        elif "hm3d" in self.data_list[0]:
+            self.dataset = "hm3d"
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def pull_image(self, index):
+        x = plt.imread(self.data_list[index])
+        q = torch.tensor(x[...,:3]).permute(2,0,1)
+
+        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
+        q_loc = torch.tensor([0] + list(q_loc['bbox']))
+        return q, q_loc, index
+
+    def draw_bbox(self, rgb: np.ndarray, bboxes: np.ndarray, bbox_categories) -> np.ndarray:
+        imgHeight, imgWidth, _ = rgb.shape
+        if bboxes.max() <= 1: bboxes[:, [0, 2]] *= imgWidth; bboxes[:, [1, 3]] *= imgHeight
+        for i, bbox in enumerate(bboxes):
+            rgb = cv2.rectangle(rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 0), int(5e-2 * imgHeight))
+            label = CATEGORIES[self.dataset][bbox_categories[i]]
+            rgb = cv2.putText(rgb, label, (int(bbox[0]), int(bbox[1]) + int(imgHeight * 0.1)), 0, 5e-3 * imgHeight, (0, 255, 255), int(2e-2 * imgHeight))
+        return rgb
 
 
 class HabitatObjectDataset(data.Dataset):
