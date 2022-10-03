@@ -5,13 +5,20 @@ import torch.utils.data as data
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import joblib, glob, os, cv2
+import joblib, glob, os
+import cv2
 from PIL import Image
-# from habitat_sim.utils.common import d3_40_colors_rgb
+with open(os.path.join(os.path.dirname(__file__), "data/coco_category.txt"), "r") as f:
+    lines = f.readlines()
+DETECTION_CATEGORIES = [line.rstrip() for line in lines]
+COCO_CATEGORIES = DETECTION_CATEGORIES
+# 40 category of interests
 with open(os.path.join(os.path.dirname(__file__), "data/matterport_category.txt"), "r") as f:
     lines = f.readlines()
 CATEGORIES = {}
 CATEGORIES['mp3d'] = [line.rstrip() for line in lines]
+CATEGORIES['hm3d'] = [line.rstrip() for line in lines]
+CATEGORIES['gibson'] = DETECTION_CATEGORIES
 
 d3_40_colors_rgb: np.ndarray = np.array(
     [
@@ -838,6 +845,13 @@ class HabitatObjectDataset(data.Dataset):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
+        self.dataset = "mp3d"
+        if "mp3d" in self.data_list[0]:
+            self.dataset = "mp3d"
+        elif "gibson" in self.data_list[0]:
+            self.dataset = "gibson"
+        elif "hm3d" in self.data_list[0]:
+            self.dataset = "hm3d"
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -857,39 +871,53 @@ class HabitatObjectDataset(data.Dataset):
         random_int = np.random.randint(10)
         if random_int == 0:
             random_int = np.random.randint(4)
+            box_size = np.maximum(np.random.rand(), 0.5)
             input_object_t = input_object_t.copy()
             if random_int == 0:
-                input_object_t[:, 3] = (input_object_t[:, 3] - input_object_t[:, 1]) * 0.5 + input_object_t[:, 1]
+                input_object_t[:, 3] = (input_object_t[:, 3] - input_object_t[:, 1]) * box_size + input_object_t[:, 1]
             elif random_int == 1:
-                input_object_t[:, 2] = (input_object_t[:, 2] - input_object_t[:, 0]) * 0.5 + input_object_t[:, 0]
+                input_object_t[:, 2] = (input_object_t[:, 2] - input_object_t[:, 0]) * box_size + input_object_t[:, 0]
             elif random_int == 2:
-                input_object_t[:, 0] = (input_object_t[:, 2] - input_object_t[:, 0]) * 0.5 + input_object_t[:, 0]
+                input_object_t[:, 0] = (input_object_t[:, 2] - input_object_t[:, 0]) * box_size + input_object_t[:, 0]
             elif random_int == 3:
-                input_object_t[:, 1] = (input_object_t[:, 3] - input_object_t[:, 1]) * 0.5 + input_object_t[:, 1]
+                input_object_t[:, 1] = (input_object_t[:, 3] - input_object_t[:, 1]) * box_size + input_object_t[:, 1]
         return input_object_t
 
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])
-        same_obj_images = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))
-        same_scene_obj = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz'))
+        same_obj_images = np.sort(glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png')))
         idx = np.random.randint(len(same_obj_images))
         x_aug = plt.imread(same_obj_images[idx])
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
-        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
 
-        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz').replace('image', 'object'))
-
-        q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
-        q_loc = torch.tensor([0] + list(q_bbox[0]))
-        k_loc = joblib.load(same_scene_obj[idx])
-        k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
+        q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
+        q_bbox = np.array(q_loc['bbox']).reshape(-1, 4)
+        # rgb_test = self.draw_bbox(x.copy(), q_bbox.copy(), [q_loc['bbox_category'].copy()])
+        q_bbox = torch.tensor([0] + list(q_bbox[0]))
+        k_loc = joblib.load(same_obj_images[idx].replace(".png",".dat.gz"))
+        k_bbox = np.array(k_loc['bbox']).reshape(-1, 4)
         k_bbox = self.reduce_half(k_bbox)
-        input_width = (k_bbox[:, 2] - k_bbox[:, 0])
-        input_height = (k_bbox[:, 3] - k_bbox[:, 1])
+        # input_width = (k_bbox[:, 2] - k_bbox[:, 0])
+        # input_height = (k_bbox[:, 3] - k_bbox[:, 1])
+        # k_bbox = self.add_bbox_noise(k_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
+        # rgb_test = self.draw_bbox(x_aug.copy(), k_bbox.copy(), [k_loc['bbox_category'].copy()])
+        k_bbox = torch.tensor([0] + list(k_bbox[0]))
 
-        k_bbox = self.add_bbox_noise(k_bbox, noise_amount=20, input_height=input_height, input_width=input_width)
-        k_loc = torch.tensor([0] + list(k_bbox[0]))
-        return [q, k], [q_loc, k_loc], index
+        if self.base_transform is not None:
+            q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
+            k = self.base_transform(Image.fromarray((x_aug*255.).astype(np.uint8)))
+        else:
+            q = torch.tensor(x[...,:3]).permute(2,0,1)
+            k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+        return [q, k], [q_bbox, k_bbox], index
+
+    def draw_bbox(self, rgb: np.ndarray, bboxes: np.ndarray, bbox_categories) -> np.ndarray:
+        imgHeight, imgWidth, _ = rgb.shape
+        if bboxes.max() <= 1: bboxes[:, [0, 2]] *= imgWidth; bboxes[:, [1, 3]] *= imgHeight
+        for i, bbox in enumerate(bboxes):
+            rgb = cv2.rectangle(rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 0), int(5e-2 * imgHeight))
+            label = CATEGORIES[self.dataset][bbox_categories[i]]
+            rgb = cv2.putText(rgb, label, (int(bbox[0]), int(bbox[1]) + int(imgHeight * 0.1)), 0, 5e-3 * imgHeight, (0, 255, 255), int(2e-2 * imgHeight))
+        return rgb
 
 
 class AI2ThorObjectDataset(data.Dataset):

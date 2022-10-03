@@ -31,8 +31,8 @@ model_names = sorted(name for name in models.__dict__
     and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('data', metavar='DIR',
-                    help='path to dataset')
+# parser.add_argument('data', metavar='DIR',
+#                     help='path to dataset')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
@@ -102,7 +102,7 @@ parser.add_argument('--warmup-epoch', default=20, type=int,
                     help='number of warm-up epochs to only train with InfoNCE loss')
 parser.add_argument('--exp-dir', default='experiment_pcl', type=str,
                     help='experiment directory')
-parser.add_argument('--data-dir', default='/disk3/nuri/mp3d_object_pcl_data', type=str,
+parser.add_argument('--data-dir', default='/disk3/nuri/mp3d_objpcl1003_directional', type=str,
                     help='experiment directory')
 
 parser.add_argument(
@@ -237,7 +237,7 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir =args.data
+    # traindir =args.data
     # traindir = os.path.join(args.data, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -250,7 +250,7 @@ def main_worker(gpu, ngpus_per_node, args):
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
-            transforms.RandomHorizontalFlip(),
+            # transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
         ]
@@ -259,7 +259,7 @@ def main_worker(gpu, ngpus_per_node, args):
         augmentation = [
             transforms.RandomGrayscale(p=0.2),
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
-            transforms.RandomHorizontalFlip(),
+            # transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
         ]
@@ -272,10 +272,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # DATA_DIR = "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
     # train_data_list = [os.path.join(DATA_DIR, 'train', x) for x in sorted(os.listdir(os.path.join(DATA_DIR, 'train')))]#[:10000]
     data_dir = args.data_dir #
-    scenes_objects = os.listdir(data_dir)
-    train_data_list = []
-    for scenes_object in scenes_objects:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scenes_object}/*.png"))
+    train_data_list = glob.glob(f"{data_dir}/*/*/*.png")
     train_dataset = pcl.loader.HabitatObjectDataset(
         train_data_list,
         transforms.Compose(augmentation),
