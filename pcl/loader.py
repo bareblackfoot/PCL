@@ -923,8 +923,8 @@ class HabitatObjectDataset(data.Dataset):
             q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
             k = self.base_transform(Image.fromarray((x_aug*255.).astype(np.uint8)))
         else:
-            q = torch.tensor(x[...,:3]).permute(2,0,1)
-            k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+            q = torch.tensor(x).permute(2,0,1)
+            k = torch.tensor(x_aug).permute(2,0,1)
         return [q, k], [q_bbox, k_bbox], index
 
     def draw_bbox(self, rgb: np.ndarray, bboxes: np.ndarray, bbox_categories) -> np.ndarray:
