@@ -908,7 +908,6 @@ class HabitatObjectDataset(data.Dataset):
         x = plt.imread(self.data_list[index])[...,:3]
         same_obj_images = list(np.sort(glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))))
         same_obj_images.remove(self.data_list[index])
-        idx = np.random.randint(len(same_obj_images))
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
         q_bbox = np.array(q_loc['bbox']).reshape(-1, 4)
@@ -927,6 +926,7 @@ class HabitatObjectDataset(data.Dataset):
             k_bbox = torch.tensor([0] + list(k_bbox[0]))
         else:
             # same_obj_images = np.stack(same_obj_images)
+            idx = np.random.randint(len(same_obj_images))
             x_aug = plt.imread(same_obj_images[idx])[...,:3]
             k_loc = joblib.load(same_obj_images[idx].replace(".png",".dat.gz"))
             k_bbox = np.array(k_loc['bbox']).reshape(-1, 4)
