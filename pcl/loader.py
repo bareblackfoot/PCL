@@ -840,8 +840,12 @@ class HabitatObjectEvalDataset(data.Dataset):
         return len(self.data_list)
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        x = plt.imread(self.data_list[index])[...,:3]
+
+        if self.base_transform is not None:
+            q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
+        else:
+            q = torch.tensor(x).permute(2,0,1)
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
         q_loc = torch.tensor([0] + list(q_loc['bbox']))
