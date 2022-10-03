@@ -906,7 +906,9 @@ class HabitatObjectDataset(data.Dataset):
 
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])[...,:3]
-        same_obj_images = np.sort(glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png')))
+        same_obj_images = list(np.sort(glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))))
+        same_obj_images.remove(self.data_list[index])
+        same_obj_images = np.stack(same_obj_images)
         idx = np.random.randint(len(same_obj_images))
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
@@ -914,7 +916,7 @@ class HabitatObjectDataset(data.Dataset):
         # rgb_test = self.draw_bbox(x.copy(), q_bbox.copy(), [q_loc['bbox_category'].copy()])
         q_bbox = torch.tensor([0] + list(q_bbox[0]))
 
-        if np.random.randint(3) == 0:
+        if np.random.randint(3) == 0 or len(same_obj_images) == 0:
             x_aug = x.copy()
             k_loc = q_loc.copy()
             k_bbox = np.array(k_loc['bbox']).reshape(-1, 4)
