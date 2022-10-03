@@ -901,10 +901,10 @@ class HabitatObjectDataset(data.Dataset):
         return input_object_t
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])
+        x = plt.imread(self.data_list[index])[:...,:3]
         same_obj_images = np.sort(glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png')))
         idx = np.random.randint(len(same_obj_images))
-        x_aug = plt.imread(same_obj_images[idx])
+        x_aug = plt.imread(same_obj_images[idx])[:...,:3]
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
         q_bbox = np.array(q_loc['bbox']).reshape(-1, 4)
