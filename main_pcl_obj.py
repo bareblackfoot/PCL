@@ -96,6 +96,7 @@ parser.add_argument('--aug-plus', action='store_true',
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
+parser.add_argument('--num-data', default=100000, type=int)
 parser.add_argument('--num-cluster', default='25000,50000,100000', type=str,
                     help='number of clusters')
 parser.add_argument('--warmup-epoch', default=20, type=int,
@@ -313,7 +314,7 @@ def get_loader(args):
         normalize
     ])
     train_data_list = glob.glob(f"{args.data_dir}/*/*/*.png")
-    train_data_list = random.sample(train_data_list, np.minimum(120000, len(train_data_list)))
+    train_data_list = random.sample(train_data_list, np.minimum(args.num_data, len(train_data_list)))
     print(len(train_data_list))
     train_dataset = pcl.loader.HabitatObjectDataset(
         train_data_list,

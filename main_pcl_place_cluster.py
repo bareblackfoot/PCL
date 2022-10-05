@@ -442,19 +442,19 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         if i % args.print_freq == 0:
             progress.display(i)
 
-            
+
 def compute_features(eval_loader, model, args):
     print('Computing features...')
     model.eval()
-    features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
+    features = torch.zeros(len(eval_loader.dataset), args.low_dim).cuda()
     for i, (images, objects, categories, index) in enumerate(tqdm(eval_loader)):
         # with torch.no_grad():
         images = images.cuda(non_blocking=True)
         objects = objects.cuda(non_blocking=True)
         categories = categories.cuda(non_blocking=True).long()
-        feat = model(images ,objects, categories, is_eval=True)
+        feat = model(images, objects, categories, is_eval=True)
         features[index] = feat
-    dist.barrier()        
+    dist.barrier()
     dist.all_reduce(features, op=dist.ReduceOp.SUM)     
     return features.cpu()
 
