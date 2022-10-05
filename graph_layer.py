@@ -243,7 +243,7 @@ class BatGraphAttentionLayer(nn.Module):
         zero_vec = -9e15*torch.ones_like(e)
         attention = torch.where(adj > 0, e, zero_vec)
         attention = F.softmax(attention, dim=-1)
-        attention = torch.where(torch.isnan(attention), Variable(torch.zeros_like(attention), requires_grad=False).cuda(), attention)
+        # attention = torch.where(torch.isnan(attention), Variable(torch.zeros_like(attention), requires_grad=False).cuda(), attention)
         attention = F.dropout(attention, self.dropout, training=self.training)
         h_prime = torch.matmul(attention, h)
         if self.concat:

@@ -1096,6 +1096,7 @@ class HabitatRGBObjDataset(data.Dataset):
         x = plt.imread(self.data_list[index])[...,:3]
         x_obj = joblib.load(self.data_list[index].replace('_rgb.png', '.dat.gz').replace('image', 'object'))
         x_obj_out = np.zeros((self.max_object, 4))
+        x_obj_out[:, 2:] = 1.
         x_obj_category_out = np.zeros((self.max_object))
         x_obj_out[:len(x_obj['bboxes'])] = x_obj['bboxes'][:self.max_object]
         x_obj_category_out[:len(x_obj['bbox_categories'])] = x_obj['bbox_categories'][:self.max_object]
@@ -1109,12 +1110,14 @@ class HabitatRGBObjDataset(data.Dataset):
         sp = plt.imread(sp_sample)[...,:3]
         sp_obj = joblib.load(sp_sample.replace('_rgb.png', '.dat.gz').replace('image', 'object'))
         sp_obj_out = np.zeros((self.max_object, 4))
+        sp_obj_out[:, 2:] = 1.
         sp_obj_category_out = np.zeros((self.max_object))
         sp_obj_out[:len(sp_obj['bboxes'])] = sp_obj['bboxes'][:self.max_object]
         sp_obj_category_out[:len(sp_obj['bbox_categories'])] = sp_obj['bbox_categories'][:self.max_object]
 
         x_aug, x_aug_obj = self.augment(sp, sp_obj)
         x_aug_obj_out = np.zeros((self.max_object, 4))
+        x_aug_obj_out[:, 2:] = 1.
         x_aug_obj_category_out = np.zeros((self.max_object))
         x_aug_obj_out[:len(x_aug_obj['bboxes'])] = x_aug_obj['bboxes'][:self.max_object]
         x_aug_obj_category_out[:len(x_aug_obj['bbox_categories'])] = x_aug_obj['bbox_categories'][:self.max_object]
@@ -1152,6 +1155,7 @@ class HabitatRGBObjEvalDataset(data.Dataset):
         x_obj = joblib.load(self.data_list[index].replace('_rgb.png', '.dat.gz').replace('image', 'object'))
 
         x_obj_out = np.zeros((self.max_object, 4))
+        x_obj_out[:, 2:] = 1.
         x_obj_category_out = np.zeros((self.max_object))
         x_obj_out[:len(x_obj['bboxes'])] = x_obj['bboxes'][:self.max_object]
         x_obj_category_out[:len(x_obj['bbox_categories'])] = x_obj['bbox_categories'][:self.max_object]
