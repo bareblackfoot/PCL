@@ -34,8 +34,8 @@ class ObjGCN(nn.Module):
         super(ObjGCN, self).__init__()
         self.dropout = dropout
         self.attentions = [BatGraphAttentionLayer(feat_dim, hidden_dim, dropout=dropout, alpha=alpha, concat=True) for _ in range(nheads)]
-        # for i, attention in enumerate(self.attentions):
-        #     self.add_module('attention_{}'.format(i), attention)
+        for i, attention in enumerate(self.attentions):
+            self.add_module('attention_{}'.format(i), attention)
         self.sc = GatedSkipConnection(feat_dim, hidden_dim * nheads)
         self.out_att = BatGraphAttentionLayer(hidden_dim * nheads, hidden_dim, dropout=dropout, alpha=alpha, concat=False)
         self.decode = nn.Linear(hidden_dim, feat_dim)
