@@ -97,7 +97,7 @@ parser.add_argument('--aug-plus', action='store_true',
                     help='use moco-v2/SimCLR data augmentation')
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
-
+parser.add_argument('--num-data', default=100000, type=int)
 parser.add_argument('--num-cluster', default='25000,50000,100000', type=str, 
                     help='number of clusters')
 parser.add_argument('--warmup-epoch', default=20, type=int,
@@ -239,81 +239,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
     cudnn.benchmark = True
 
-    # Data loading code
-    # traindir =args.data
-    # traindir = os.path.join(args.data, 'train')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    
-    if args.aug_plus:
-        # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
-        augmentation = [
-            transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-            ], p=0.8),
-            # transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]
-    else:
-        # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
-        augmentation = [
-            # transforms.RandomGrayscale(p=0.2),
-            transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]
-
-    # center-crop augmentation 
-    eval_augmentation = transforms.Compose([
-        transforms.ToTensor(),
-        normalize
-        ])
-    # "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
-
-    train_data_list = []
-    # if "mp3" in args.data:
-    #     data_dir = args.data
-    # else:
-    data_dir = os.path.join(args.data, "train")
-    scenes = os.listdir(data_dir)
-    for scene in scenes:
-        places = glob.glob(os.path.join(data_dir, scene) + "/*")
-        for place in places:
-            place_name = place.split("/")[-1]
-            # print(place_name)
-            # if place_name in ["kitchen", "bedroom", "bathroom", "closet", "living room"]:
-            train_data_list.extend(glob.glob(place + "/*_rgb.png"))
-
-    train_dataset = pcl.loader.HabitatRGBObjDataset(
-        train_data_list,
-        transforms.Compose(augmentation),
-        args.noisydepth)
-    eval_dataset = pcl.loader.HabitatRGBObjEvalDataset(
-        train_data_list,
-        eval_augmentation,
-        args.noisydepth)
-    
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-        eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
-    else:
-        train_sampler = None
-        eval_sampler = None
-
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
-    
-    # dataloader for center-cropped images, use larger batch size to increase speed
-    eval_loader = torch.utils.data.DataLoader(
-        eval_dataset, batch_size=args.batch_size*5, shuffle=False,
-        sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
-    
     for epoch in range(args.start_epoch, args.epochs):
+        train_loader, eval_loader, train_sampler, eval_sampler, train_dataset, eval_dataset = get_loader(args)
         cluster_result = None
         if epoch>=args.warmup_epoch:
             # compute momentum features for center-cropped images
@@ -357,6 +284,78 @@ def main_worker(gpu, ngpus_per_node, args):
             # save_checkpoint({k[len('module.encoder_k.'):]: v for k, v in ckpt['state_dict'].items() if 'module.encoder_k.' in k}, is_best=False, filename='{}/PCL_{:04d}.pth.tar'.format(args.exp_dir,epoch))
 
 
+def get_loader(args):
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    if args.aug_plus:
+        # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
+        augmentation = [
+            transforms.RandomApply([
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
+            ], p=0.8),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
+            # transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize
+        ]
+    else:
+        # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
+        augmentation = [
+            transforms.RandomGrayscale(p=0.2),
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
+            # transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize
+        ]
+
+    # center-crop augmentation
+    eval_augmentation = transforms.Compose([
+        transforms.ToTensor(),
+        normalize
+    ])
+    train_data_list = []
+    data_dir = os.path.join(args.data, "train")
+    scenes = os.listdir(data_dir)
+    for scene in scenes:
+        places = glob.glob(os.path.join(data_dir, scene) + "/*")
+        for place in places:
+            # place_name = place.split("/")[-1]
+            # print(place_name)
+            # if place_name in ["kitchen", "bedroom", "bathroom", "closet", "living room"]:
+            train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+
+    train_data_list = random.sample(train_data_list, np.minimum(args.num_data, len(train_data_list)))
+    print(len(train_data_list))
+
+    train_dataset = pcl.loader.HabitatRGBObjDataset(
+        train_data_list,
+        transforms.Compose(augmentation),
+        args.noisydepth)
+    eval_dataset = pcl.loader.HabitatRGBObjEvalDataset(
+        train_data_list,
+        eval_augmentation,
+        args.noisydepth)
+
+    if args.distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset, shuffle=False)
+    else:
+        train_sampler = None
+        eval_sampler = None
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+        num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+
+    # dataloader for center-cropped images, use larger batch size to increase speed
+    eval_loader = torch.utils.data.DataLoader(
+        eval_dataset, batch_size=args.batch_size * 5, shuffle=False,
+        sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
+    return train_loader, eval_loader, train_sampler, eval_sampler, train_dataset, eval_dataset
+
+
 def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result=None):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
@@ -371,7 +370,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
 
     # switch to train mode
     model.train()
-
 
     end = time.time()
     for i, (images, objects, object_categories, index) in enumerate(train_loader):
@@ -391,7 +389,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             # scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
-                
+
         # compute output
         output, target, output_soft, target_soft, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2],
                                                                                      obj_q=objects[0], obj_soft=objects[1], obj_k=objects[2],
@@ -450,12 +448,12 @@ def compute_features(eval_loader, model, args):
     model.eval()
     features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
     for i, (images, objects, categories, index) in enumerate(tqdm(eval_loader)):
-        with torch.no_grad():
-            images = images.cuda(non_blocking=True)
-            objects = objects.cuda(non_blocking=True)
-            categories = categories.cuda(non_blocking=True).long()
-            feat = model(images,objects,categories,is_eval=True)
-            features[index] = feat
+        # with torch.no_grad():
+        images = images.cuda(non_blocking=True)
+        objects = objects.cuda(non_blocking=True)
+        categories = categories.cuda(non_blocking=True).long()
+        feat = model(images ,objects, categories, is_eval=True)
+        features[index] = feat
     dist.barrier()        
     dist.all_reduce(features, op=dist.ReduceOp.SUM)     
     return features.cpu()
