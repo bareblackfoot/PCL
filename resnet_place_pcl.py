@@ -194,7 +194,7 @@ class ResNet(nn.Module):
         self.concat_cat = nn.Linear(128 * 2, 128)
         self.concat = nn.Linear(128 * block.expansion + 128, num_classes)
         self.obj_cat = nn.Linear(128 * 10, 128)
-        self.adj_ = torch.ones([200, 400,400]).cuda()
+        self.adj_ = torch.ones([1000, 400,400]).cuda()
         #     nn.Linear(128 * 7 * 7, 32 * 2),
         #     nn.ReLU(),
         #     nn.Linear(32 * 2, 32)
