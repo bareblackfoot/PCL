@@ -22,6 +22,7 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
+from torch.autograd import Variable
 # from pcl.resnet_sem import resnet18
 
 import pcl.loader
@@ -402,6 +403,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         # Soft InfoNCE loss
         loss_soft = criterion(output_soft, target_soft)
         loss += loss_soft
+        loss = torch.where(torch.isnan(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
+        loss = torch.where(torch.isinf(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
 
         # Adversarial loss
         # loss_adv = -0.1 * criterion(output_adv, target_adv)
@@ -457,6 +460,7 @@ def compute_features(eval_loader, model, args):
     dist.barrier()
     dist.all_reduce(features, op=dist.ReduceOp.SUM)     
     return features.cpu()
+
 
 def run_kmeans(x, args):
     """
@@ -523,7 +527,7 @@ def run_kmeans(x, args):
         
         results['centroids'].append(centroids)
         results['density'].append(density)
-        results['im2cluster'].append(im2cluster)    
+        results['im2cluster'].append(im2cluster)
         
     return results
 
