@@ -194,7 +194,7 @@ class ResNet(nn.Module):
         self.concat_cat = nn.Linear(128 * 2, 128)
         self.concat = nn.Linear(128 * block.expansion + 128, num_classes)
         self.obj_cat = nn.Linear(128 * 10, 128)
-        self.adj_ = torch.ones([1000, 400,400]).cuda()
+        # self.adj_ = torch.ones([1000, 400,400]).cuda()
         #     nn.Linear(128 * 7 * 7, 32 * 2),
         #     nn.ReLU(),
         #     nn.Linear(32 * 2, 32)
@@ -292,7 +292,7 @@ class ResNet(nn.Module):
         x_obj = self.fc_obj(x_obj)
         obj_category = self.cat_embed(torch.clip(rois_category, 0, 40))
         x_obj = self.concat_cat(torch.cat([x_obj.reshape(B, NO, -1), obj_category], -1))
-        x_obj = self.obj_gcn(x_obj, self.adj_[:x_obj.shape[0], :x_obj.shape[1],:x_obj.shape[1]])# torch.ones([x_obj.shape[0], x_obj.shape[1], x_obj.shape[1]]).cuda())
+        x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1], x_obj.shape[1]]).to(x_obj.device))
         x_obj = self.obj_cat(x_obj.flatten(1))
         x_combined = self.concat(torch.cat([x_im , x_obj], -1))
         return x_combined
