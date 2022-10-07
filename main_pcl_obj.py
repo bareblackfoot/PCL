@@ -248,8 +248,8 @@ def main_worker(gpu, ngpus_per_node, args):
             # placeholder for clustering result
             cluster_result = {'im2cluster':[],'centroids':[],'density':[]}
             for num_cluster in args.num_cluster:
-                cluster_result['im2cluster'].append(torch.zeros(len(eval_dataset),dtype=torch.long).cuda())
-                cluster_result['centroids'].append(torch.zeros(int(num_cluster),args.low_dim).cuda())
+                cluster_result['im2cluster'].append(torch.zeros(len(eval_dataset), dtype=torch.long).cuda())
+                cluster_result['centroids'].append(torch.zeros(int(num_cluster), args.low_dim).cuda())
                 cluster_result['density'].append(torch.zeros(int(num_cluster)).cuda()) 
 
             if args.gpu == 0:
@@ -257,8 +257,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 features = features.numpy()
                 cluster_result = run_kmeans(features,args)  #run kmeans clustering on master node
                 # save the clustering result
-                # torch.save(cluster_result,os.path.join(args.exp_dir, 'clusters_%d'%epoch))  
-                
+                # torch.save(cluster_result,os.path.join(args.exp_dir, 'clusters_%d'%epoch))
+
             dist.barrier()  
             # broadcast clustering result
             for k, data_list in cluster_result.items():
@@ -342,6 +342,7 @@ def get_loader(args):
         sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
     return train_loader, eval_loader, train_sampler, eval_sampler, train_dataset, eval_dataset
 
+
 def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result=None):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
@@ -367,12 +368,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
             objects[0] = objects[0].cuda(args.gpu, non_blocking=True)
             objects[1] = objects[1].cuda(args.gpu, non_blocking=True)
-                
+
         # compute output
         output, target, output_proto, target_proto = model(im_q=images[0], obj_q=objects[0],  im_k=images[1], obj_k=objects[1], cluster_result=cluster_result, index=index)
         
         # InfoNCE loss
-        loss = criterion(output, target)  
+        loss = criterion(output, target)
         
         # ProtoNCE loss
         if output_proto is not None:

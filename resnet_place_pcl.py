@@ -294,7 +294,7 @@ class ResNet(nn.Module):
         x_obj = self.concat_cat(torch.cat([x_obj.reshape(B, NO, -1), obj_category], -1))
         x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1], x_obj.shape[1]]).to(x_obj.device))
         x_obj = self.obj_cat(x_obj.flatten(1))
-        x_combined = self.concat(torch.cat([x_im , x_obj], -1))
+        x_combined = self.concat(torch.cat([x_im, x_obj], -1))
         return x_combined
 
 
