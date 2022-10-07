@@ -273,7 +273,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 idx = idx + np.where(np.isnan(features.sum(-1)))[0]
                 print(idx)
                 print([train_dataset.data_list[id_] for id_ in idx])
-            if np.any([torch.any(torch.isinf(cluster_result['density'][i])).item() for i in range(len(cluster_result['density']))]):
+            elif np.any([torch.any(torch.isinf(cluster_result['density'][i])).item() for i in range(len(cluster_result['density']))]):
                 cluster_result = None
                 print('Inf detected in density, skip this epoch')
                 idx = np.where(np.isinf(features.sum(-1)))[0]
