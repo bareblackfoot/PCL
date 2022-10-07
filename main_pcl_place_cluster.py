@@ -265,13 +265,21 @@ def main_worker(gpu, ngpus_per_node, args):
             # broadcast clustering result
             for k, data_list in cluster_result.items():
                 for data_tensor in data_list:                
-                    dist.broadcast(data_tensor, 0, async_op=False)     
-        if np.any([torch.any(torch.isnan(cluster_result['density'][i])).item() for i in range(len(cluster_result['density']))]):
-            cluster_result = None
-            print('NaN detected in density, skip this epoch')
-        if np.any([torch.any(torch.isinf(cluster_result['density'][i])).item() for i in range(len(cluster_result['density']))]):
-            cluster_result = None
-            print('Inf detected in density, skip this epoch')
+                    dist.broadcast(data_tensor, 0, async_op=False)
+            if np.any([torch.any(torch.isnan(cluster_result['density'][i])).item() for i in range(len(cluster_result['density']))]):
+                cluster_result = None
+                print('NaN detected in density, skip this epoch')
+                idx = np.where(np.isinf(features.sum(-1)))[0]
+                idx = idx + np.where(np.isnan(features.sum(-1)))[0]
+                print(idx)
+                print([train_dataset.data_list[id_] for id_ in idx])
+            if np.any([torch.any(torch.isinf(cluster_result['density'][i])).item() for i in range(len(cluster_result['density']))]):
+                cluster_result = None
+                print('Inf detected in density, skip this epoch')
+                idx = np.where(np.isinf(features.sum(-1)))[0]
+                idx = idx + np.where(np.isnan(features.sum(-1)))[0]
+                print(idx)
+                print([train_dataset.data_list[id_] for id_ in idx])
 
         if args.distributed:
             train_sampler.set_epoch(epoch)
