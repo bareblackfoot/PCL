@@ -262,6 +262,7 @@ class ResNet(nn.Module):
     def forward(self, x, rois, rois_category):
         B, C, H, W = x.shape
         _, NO, _ = rois.shape
+        print(B, C, H, W, NO)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
