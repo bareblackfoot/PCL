@@ -1112,12 +1112,13 @@ class HabitatRGBObjDataset(data.Dataset):
         # sp_sample = same_place_list[idx]
         data_ii = self.hists_datapath.index(self.data_list[index])
         hist = self.hists[data_ii]
-        similarity = -np.sum(hist * np.log(hist/(self.hists+0.0001)),-1)
+        similarity = -np.sum(hist[None] * np.log(hist[None] / (self.hists + 0.0001)),-1)
         similarity[data_ii] = 0
-        idx = np.random.choice(len(similarity), p=similarity)
-        sp_sample = self.sim_datapath[idx]
+        cands = np.argsort(-similarity)[:10]
+        idx = random.choices(np.arange(len(cands)))[0]
+        sp_sample = self.hists_datapath[idx]
         sp = plt.imread(sp_sample)[...,:3]
-        sp_obj = joblib.load(sp_sample.replace('_rgb.png', '.dat.gz').replace('image', 'object'))
+        sp_obj = joblib.load(sp_sample.replace('_rgb.png', '.dat.gz'))
         sp_obj_out = np.zeros((self.max_object, 4))
         sp_obj_out[:, 2:] = 1.
         sp_obj_category_out = np.zeros((self.max_object))
