@@ -390,7 +390,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             object_categories[2] = object_categories[2].cuda(args.gpu, non_blocking=True).long() #k2
 
         # compute output query(q), same_place_rot(soft), same_place(k)
-        output, target, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2],
+        output, target, output_proto, target_proto = model(im_q=images[0], im_k=images[2],
                                                            obj_q=objects[0], obj_k=objects[2],
                                                            cat_q=object_categories[0], cat_k=object_categories[2],
                                                            cluster_result=cluster_result, index=index) # im_n=images[2], output_adv, target_adv,
