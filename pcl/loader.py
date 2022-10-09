@@ -1060,6 +1060,7 @@ class HabitatRGBObjDataset(data.Dataset):
         hists = joblib.load("/".join(data_list[0].split("/")[:5]) + '/object_hists.dat.gz')
         self.hists = hists['hists']
         self.hists_datapath = hists['data_path']
+        self.num_camera = 12
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -1068,12 +1069,13 @@ class HabitatRGBObjDataset(data.Dataset):
         return len(self.data_list)
 
     def augment(self, rgb, obj):
-        data_patches = np.stack([rgb[:, i * 21:(i + 1) * 21] for i in range(12)])
-        index_list = np.arange(0, 12).tolist()
-        random_cut = np.random.randint(12)
+        patch_size = rgb.shape[1]//self.num_camera
+        data_patches = np.stack([rgb[:, i * patch_size:(i + 1) * patch_size] for i in range(self.num_camera)])
+        index_list = np.arange(0, self.num_camera).tolist()
+        random_cut = np.random.randint(self.num_camera)
         index_list = index_list[random_cut:] + index_list[:random_cut]
         permuted_patches = data_patches[index_list]
-        rgb_roted = np.concatenate(np.split(permuted_patches, 12, axis=0), 2)[0]
+        rgb_roted = np.concatenate(np.split(permuted_patches, self.num_camera, axis=0), 2)[0]
         a = float(random_cut * 21)
         width = float(rgb.shape[1])
         bboxes = obj['bboxes'].copy()
