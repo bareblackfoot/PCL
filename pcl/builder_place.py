@@ -121,7 +121,7 @@ class MoCo(nn.Module):
 
     def forward(self, im_q, obj_q, cat_q, im_soft=None, im_k=None, obj_soft=None, obj_k=None, cat_k=None, cat_soft=None, is_eval=False, cluster_result=None, index=None):
         """
-        Input:
+        Input: query(q), same_place_rot(soft), same_place(k)
             im_q: a batch of query images
             im_k: a batch of key images
             is_eval: return momentum embeddings (used for clustering)
@@ -149,7 +149,7 @@ class MoCo(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
-        # compute negative features
+        # compute negative features (same_place_rot(soft), same_place(k) => in the similar metric space)
         q_soft = self.encoder_q(im_soft, obj_soft, cat_soft)  # queries: NxC
         q_soft = nn.functional.normalize(q_soft, dim=1)
         l_pos_soft = torch.einsum('nc,nc->n', [q_soft, k]).unsqueeze(-1)
@@ -164,7 +164,7 @@ class MoCo(nn.Module):
         # labels: positive key indicators
         labels_soft = torch.zeros(logits_soft.shape[0], dtype=torch.long).cuda()
 
-        # compute query features
+        # compute query features (query(q), same_place(k) => in the similar metric space)
         q = self.encoder_q(im_q, obj_q, cat_q)  # queries: NxC
         # logit_scene = None
         # logit_scene = self.logit_scene_fc(q)

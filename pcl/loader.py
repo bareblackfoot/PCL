@@ -1142,7 +1142,7 @@ class HabitatRGBObjDataset(data.Dataset):
             q = torch.tensor(x).permute(2,0,1).float()
             k1 = torch.tensor(x_aug).permute(2,0,1).float()
             k2 = torch.tensor(sp).permute(2,0,1).float()
-
+        # query, same_place_rot, same_place
         return [q, k1, k2], [x_obj_out, x_aug_obj_out, sp_obj_out], [x_obj_category_out, x_aug_obj_category_out, sp_obj_category_out], index
 
 

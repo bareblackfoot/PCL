@@ -397,7 +397,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
 
-        # compute output
+        # compute output query(q), same_place_rot(soft), same_place(k)
         output, target, output_soft, target_soft, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2],
                                                                                      obj_q=objects[0], obj_soft=objects[1], obj_k=objects[2],
                                                                                      cat_q=object_categories[0], cat_soft=object_categories[1], cat_k=object_categories[2],
