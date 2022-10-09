@@ -1115,7 +1115,7 @@ class HabitatRGBObjDataset(data.Dataset):
         similarity = -np.sum(hist[None] * np.log(hist[None] / (self.hists + 0.0001)),-1)
         similarity[data_ii] = 0
         cands = np.argsort(-similarity)[:10]
-        idx = random.choices(np.arange(len(cands)))[0]
+        idx = cands[random.choices(np.arange(len(cands)))[0]]
         sp_sample = self.hists_datapath[idx]
         sp = plt.imread(sp_sample)[...,:3]
         sp_obj = joblib.load(sp_sample.replace('_rgb.png', '.dat.gz'))
