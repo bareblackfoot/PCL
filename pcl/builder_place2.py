@@ -119,7 +119,7 @@ class MoCo(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, obj_q, cat_q, im_k=None, obj_k=None, cat_k=None, is_eval=False, cluster_result=None, index=None):
+    def forward(self, im_q, obj_q, cat_q, im_soft=None, im_k=None, obj_soft=None, obj_k=None, cat_k=None, cat_soft=None, is_eval=False, cluster_result=None, index=None):
         """
         Input: query(q), same_place_rot(soft), same_place(k)
             im_q: a batch of query images
@@ -149,8 +149,25 @@ class MoCo(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
+        # compute negative features (same_place_rot(soft), same_place(k) => in the similar metric space)
+        q_soft = self.encoder_q(im_soft, obj_soft, cat_soft)  # queries: NxC
+        q_soft = nn.functional.normalize(q_soft, dim=1)
+        l_pos_soft = torch.einsum('nc,nc->n', [q_soft, k]).unsqueeze(-1)
+        l_neg_soft = torch.einsum('nc,ck->nk', [q_soft,  self.queue.clone().detach()])
+
+        # logits: Nx(1+r)
+        logits_soft = torch.cat([l_pos_soft, l_neg_soft], dim=1)
+
+        # apply temperature
+        logits_soft /= self.T_soft
+
+        # labels: positive key indicators
+        labels_soft = torch.zeros(logits_soft.shape[0], dtype=torch.long).cuda()
+
         # compute query features (query(q), same_place(k) => in the similar metric space)
         q = self.encoder_q(im_q, obj_q, cat_q)  # queries: NxC
+        # logit_scene = None
+        # logit_scene = self.logit_scene_fc(q)
         q = nn.functional.normalize(q, dim=1)
         
         # compute logits
@@ -201,9 +218,9 @@ class MoCo(nn.Module):
                 
                 proto_labels.append(labels_proto)
                 proto_logits.append(logits_proto)
-            return logits, labels, proto_logits, proto_labels
+            return logits, labels, logits_soft, labels_soft, proto_logits, proto_labels
         else:
-            return logits, labels, None, None
+            return logits, labels, logits_soft, labels_soft, None, None
 
 
 # utils

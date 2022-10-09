@@ -26,7 +26,7 @@ from torch.autograd import Variable
 # from pcl.resnet_sem import resnet18
 
 import pcl.loader
-import pcl.builder_place
+import pcl.builder_place2 as builder
 import glob
 
 model_names = sorted(name for name in models.__dict__
@@ -179,7 +179,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     from resnet_place_pcl import resnet18
-    model = pcl.builder_place.MoCo(
+    model = builder.MoCo(
         resnet18,
         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
 
@@ -331,7 +331,7 @@ def get_loader(args):
             # if place_name in ["kitchen", "bedroom", "bathroom", "closet", "living room"]:
             train_data_list.extend(glob.glob(place + "/*_rgb.png"))
 
-    train_data_list = random.sample(train_data_list, np.minimum(args.num_data, len(train_data_list)))
+    # train_data_list = random.sample(train_data_list, np.minimum(args.num_data, len(train_data_list)))
     print(len(train_data_list))
 
     train_dataset = pcl.loader.HabitatRGBObjDataset(
@@ -383,39 +383,20 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
 
         if args.gpu is not None:
             images[0] = images[0].cuda(args.gpu, non_blocking=True) # q
-            images[1] = images[1].cuda(args.gpu, non_blocking=True) #k1
             images[2] = images[2].cuda(args.gpu, non_blocking=True) #k2
             objects[0] = objects[0].cuda(args.gpu, non_blocking=True) # q
-            objects[1] = objects[1].cuda(args.gpu, non_blocking=True) #k1
             objects[2] = objects[2].cuda(args.gpu, non_blocking=True) #k2
             object_categories[0] = object_categories[0].cuda(args.gpu, non_blocking=True).long() # q
-            object_categories[1] = object_categories[1].cuda(args.gpu, non_blocking=True).long() #k1
             object_categories[2] = object_categories[2].cuda(args.gpu, non_blocking=True).long() #k2
-            # scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
-            # if epoch < args.warmup_epoch:
-            #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
 
         # compute output query(q), same_place_rot(soft), same_place(k)
-        output, target, output_soft, target_soft, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2],
-                                                                                     obj_q=objects[0], obj_soft=objects[1], obj_k=objects[2],
-                                                                                     cat_q=object_categories[0], cat_soft=object_categories[1], cat_k=object_categories[2],
-                                                                                     cluster_result=cluster_result, index=index) # im_n=images[2], output_adv, target_adv,
+        output, target, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2],
+                                                           obj_q=objects[0], obj_k=objects[2],
+                                                           cat_q=object_categories[0], cat_k=object_categories[2],
+                                                           cluster_result=cluster_result, index=index) # im_n=images[2], output_adv, target_adv,
         
         # InfoNCE loss
-        loss = criterion(output, target)  
-
-        # Soft InfoNCE loss
-        loss_soft = criterion(output_soft, target_soft)
-        loss += loss_soft
-        loss = torch.where(torch.isnan(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
-        loss = torch.where(torch.isinf(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
-
-        # Adversarial loss
-        # loss_adv = -0.1 * criterion(output_adv, target_adv)
-
-        # Scene loss
-        # loss_scene = torch.clip(1.0-0.1 * criterion(feat, scene_idx), 0.0)
-        # loss += loss_adv
+        loss = criterion(output, target)
 
         # ProtoNCE loss
         if output_proto is not None:
