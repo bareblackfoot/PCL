@@ -1,7 +1,6 @@
-name: habitat
+name: pcl
 channels:
   - pytorch
-  - aihabitat
   - conda-forge
   - defaults
 dependencies:
@@ -24,7 +23,6 @@ dependencies:
   - gitpython=3.1.27=pyhd8ed1ab_0
   - gmp=6.2.1=h58526e2_0
   - gnutls=3.6.13=h85f3911_1
-  - habitat-sim-mutex=1.0=headless_bullet
   - headless=2.0=0
   - imageio=2.21.2=pyhfa7a67d_0
   - imageio-ffmpeg=0.4.7=pyhd8ed1ab_0
@@ -139,7 +137,6 @@ dependencies:
     - gym==0.22.0
     - gym-notices==0.0.8
     - h5py==3.7.0
-    - habitat-sim==0.2.2
     - hydra-core==1.2.0
     - idna==3.3
     - ifcfg==0.23
@@ -209,4 +206,4 @@ dependencies:
     - wheel==0.37.1
     - yacs==0.1.8
     - zipp==3.8.1
-prefix: /home/blackfoot/anaconda3/envs/habitat
+prefix: /home/blackfoot/anaconda3/envs/pcl
