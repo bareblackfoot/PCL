@@ -1059,6 +1059,8 @@ class HabitatRGBObjDataset(data.Dataset):
         self.max_object = 10
         hists = joblib.load("/".join(data_list[0].split("/")[:5]) + '/object_hists.dat.gz')
         self.hists = hists['hists']
+        for i, hist_path in enumerate( hists['data_path']):
+            hists['data_path'][i] = os.path.join("/".join(data_list[0].split("/")[:-5]), "/".join(hist_path.split("/")[-5:]))
         self.hists_datapath = hists['data_path']
         self.num_camera = 12
 
