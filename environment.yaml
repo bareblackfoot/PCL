@@ -183,9 +183,6 @@ dependencies:
     - sklearn==0.0
     - tabulate==0.8.10
     - tb-nightly==2.11.0a20220901
-    - tensorboard==2.8.0
-    - tensorboard-data-server==0.6.1
-    - tensorboard-plugin-wit==1.8.1
     - tensorflow==1.13.1
     - tensorflow-estimator==1.13.0
     - threadpoolctl==3.1.0
