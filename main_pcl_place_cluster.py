@@ -407,8 +407,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         # Soft InfoNCE loss
         loss_soft = criterion(output_soft, target_soft)
         loss += loss_soft
-        loss = torch.where(torch.isnan(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
-        loss = torch.where(torch.isinf(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
+        # loss = torch.where(torch.isnan(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
+        # loss = torch.where(torch.isinf(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
 
         # Adversarial loss
         # loss_adv = -0.1 * criterion(output_adv, target_adv)
@@ -420,7 +420,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         # ProtoNCE loss
         if output_proto is not None:
             loss_proto = 0
-            for proto_out,proto_target in zip(output_proto, target_proto):
+            for proto_out, proto_target in zip(output_proto, target_proto):
                 loss_proto += criterion(proto_out, proto_target)  
                 accp = accuracy(proto_out, proto_target)[0] 
                 acc_proto.update(accp[0], images[0].size(0))

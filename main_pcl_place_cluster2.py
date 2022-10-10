@@ -388,7 +388,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
             objects[2] = objects[2].cuda(args.gpu, non_blocking=True) #k2
             object_categories[0] = object_categories[0].cuda(args.gpu, non_blocking=True).long() # q
             object_categories[2] = object_categories[2].cuda(args.gpu, non_blocking=True).long() #k2
-
+        #
         # compute output query(q), same_place_rot(soft), same_place(k)
         output, target, output_proto, target_proto = model(im_q=images[0], im_k=images[2],
                                                            obj_q=objects[0], obj_k=objects[2],
@@ -408,7 +408,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
                 
             # average loss across all sets of prototypes
             loss_proto /= len(args.num_cluster) 
-            loss += loss_proto   
+            loss += loss_proto
 
         losses.update(loss.item(), images[0].size(0))
         acc = accuracy(output, target)[0] 
