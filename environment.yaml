@@ -162,7 +162,6 @@ dependencies:
     - portalocker==2.5.1
     - proglog==0.1.10
     - promise==2.3
-    - protobuf==3.20.1
     - psutil==5.9.1
     - pyasn1==0.5.0rc2
     - pyasn1-modules==0.3.0rc1
