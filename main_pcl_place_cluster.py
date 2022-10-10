@@ -328,7 +328,7 @@ def get_loader(args):
         for place in places:
             place_name = place.split("/")[-1]
             # print(place_name)
-            if place_name in ["kitchen", "bedroom", "bathroom", "closet", "living room"]:
+            if place_name in ["kitchen", "bedroom", "bathroom", "closet", "living room", "dining room", "office", "tv", "hallway"]:
                 train_data_list.extend(glob.glob(place + "/*_rgb.png"))
 
     train_data_list = random.sample(train_data_list, np.minimum(args.num_data, len(train_data_list)))
