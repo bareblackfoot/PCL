@@ -286,12 +286,19 @@ class ResNet(nn.Module):
             rois_new[..., 4] = rois_new[..., 4] * H
         for i in range(len(rois_new)):
             rois_new[i, :, 0] = i
-        x_obj = roi_align(x_inter, rois_new.reshape(-1, 5), (7, 7), 1.0/(2**3))#, aligned=True)
+        try:
+            x_obj = roi_align(x_inter, rois_new.reshape(-1, 5), (7, 7), 1.0/(2**3), aligned=True)
+        except:
+            x_obj = roi_align(x_inter, rois_new.reshape(-1, 5), (7, 7), 1.0/(2**3))#, aligned=True)
+
         # x = self.object_compression(x)
         x_obj = self.avgpool(x_obj)
         x_obj = torch.flatten(x_obj, 1)
         x_obj = self.fc_obj(x_obj)
-        obj_category = self.cat_embed(torch.clip(rois_category, 0, 40))
+        try:
+            obj_category = self.cat_embed(torch.clip(rois_category, 0, 40))
+        except:
+            obj_category = self.cat_embed(rois_category)
         x_obj = self.concat_cat(torch.cat([x_obj.reshape(B, NO, -1), obj_category], -1))
         x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1], x_obj.shape[1]]).to(x_obj.device))
         x_obj = self.obj_cat(x_obj.flatten(1))
