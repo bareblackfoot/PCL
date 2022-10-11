@@ -189,7 +189,7 @@ class ResNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
         self.fc_obj = nn.Linear(128 * block.expansion, num_classes)
-        self.obj_gcn = ObjGCN(128)
+        # self.obj_gcn = ObjGCN(128)
         self.cat_embed = nn.Embedding(41, 128)
         self.concat_cat = nn.Linear(128 * 2, 128)
         self.concat = nn.Linear(128 * block.expansion + 128, num_classes)
@@ -300,7 +300,7 @@ class ResNet(nn.Module):
         except:
             obj_category = self.cat_embed(rois_category)
         x_obj = self.concat_cat(torch.cat([x_obj.reshape(B, NO, -1), obj_category], -1))
-        x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1], x_obj.shape[1]]).to(x_obj.device))
+        # x_obj = self.obj_gcn(x_obj, torch.ones([x_obj.shape[0], x_obj.shape[1], x_obj.shape[1]]).to(x_obj.device))
         x_obj = self.obj_cat(x_obj.flatten(1))
         x_combined = self.concat(torch.cat([x_im, x_obj], -1))
         return x_combined
