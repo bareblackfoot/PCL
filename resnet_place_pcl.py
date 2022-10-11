@@ -189,7 +189,7 @@ class ResNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
         self.fc_obj = nn.Linear(128 * block.expansion, num_classes)
-        # self.obj_gcn = ObjGCN(128)
+        self.obj_gcn = ObjGCN(128)
         self.cat_embed = nn.Embedding(41, 128)
         self.concat_cat = nn.Linear(128 * 2, 128)
         self.concat = nn.Linear(128 * block.expansion + 128, num_classes)
