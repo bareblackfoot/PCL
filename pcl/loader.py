@@ -1063,6 +1063,24 @@ class HabitatRGBObjDataset(data.Dataset):
             hists['data_path'][i] = os.path.join("/".join(data_list[0].split("/")[:-5]), "/".join(hist_path.split("/")[-5:]))
         self.hists_datapath = hists['data_path']
         self.num_camera = 12
+        self.unique_places = ['']
+        self.place_mapping = {
+            'living room': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+            'familyroom_lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+            'lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+            'tv': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+            'bedroom': ['bedroom'],
+            'kitchen': ['kitchen'],
+            'closet': ['closet'],
+            'dining room': ['dining room', 'dining booth'],
+            'dining booth': ['dining room', 'dining booth'],
+            'bathroom': ['bathroom', 'toilet'],
+            'toilet': ['bathroom', 'toilet'],
+            'office': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+            'classroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+            'meetingroom_conferenceroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+            'library': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+            }
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -1109,7 +1127,8 @@ class HabitatRGBObjDataset(data.Dataset):
         x_obj_category_out[:len(x_obj['bbox_categories'])] = x_obj['bbox_categories'][:self.max_object]
 
         place = self.data_list[index].split("/")[-2]
-        same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == place]
+        match_places = self.place_mapping[place]
+        same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] in match_places]
         if len(same_place_list) > 1:
             same_place_list.remove(self.data_list[index])
         idx = np.random.randint(len(same_place_list))

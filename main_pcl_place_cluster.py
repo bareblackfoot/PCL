@@ -320,6 +320,9 @@ def get_loader(args):
         transforms.ToTensor(),
         normalize
     ])
+    unique_places = ['living room', 'familyroom_lounge', 'lounge', 'tv', 'bedroom', 'kitchen',
+                     'dining room', 'dining booth', 'bathroom', 'toilet', 'office', 'classroom',
+                     'meetingroom_conferenceroom', 'library', 'closet']
     train_data_list = []
     data_dir = os.path.join(args.data, "train")
     scenes = os.listdir(data_dir)
@@ -328,7 +331,7 @@ def get_loader(args):
         for place in places:
             place_name = place.split("/")[-1]
             # print(place_name)
-            if place_name in ["kitchen", "bedroom", "bathroom", "closet", "living room", "dining room", "office", "tv", "hallway"]:
+            if place_name in unique_places:
                 train_data_list.extend(glob.glob(place + "/*_rgb.png"))
 
     train_data_list = random.sample(train_data_list, np.minimum(args.num_data, len(train_data_list)))
