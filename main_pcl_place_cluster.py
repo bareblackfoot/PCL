@@ -320,9 +320,10 @@ def get_loader(args):
         transforms.ToTensor(),
         normalize
     ])
-    unique_places = ['living room', 'familyroom_lounge', 'lounge', 'tv', 'bedroom', 'kitchen',
-                     'dining room', 'dining booth', 'bathroom', 'toilet', 'office', 'classroom',
-                     'meetingroom_conferenceroom', 'library', 'closet']
+
+    unique_places = ['living room', 'tv', 'bedroom', 'kitchen',
+                     'dining room', 'dining booth', 'bathroom', 'toilet',
+                     'closet', 'hallway']
     train_data_list = []
     data_dir = os.path.join(args.data, "train")
     scenes = os.listdir(data_dir)

@@ -1065,21 +1065,22 @@ class HabitatRGBObjDataset(data.Dataset):
         self.num_camera = 12
         self.unique_places = ['']
         self.place_mapping = {
-            'living room': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
-            'familyroom_lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
-            'lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
-            'tv': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+            'living room': ['living room'],
+            # 'familyroom_lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+            # 'lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+            'tv': ['tv'],
             'bedroom': ['bedroom'],
             'kitchen': ['kitchen'],
             'closet': ['closet'],
             'dining room': ['dining room', 'dining booth'],
             'dining booth': ['dining room', 'dining booth'],
-            'bathroom': ['bathroom', 'toilet'],
-            'toilet': ['bathroom', 'toilet'],
-            'office': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
-            'classroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
-            'meetingroom_conferenceroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
-            'library': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+            'bathroom': ['bathroom'],
+            'toilet': ['toilet'],
+            'hallway': ['hallway'],
+            # 'office': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+            # 'classroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+            # 'meetingroom_conferenceroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+            # 'library': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
             }
 
     def __getitem__(self, index):
