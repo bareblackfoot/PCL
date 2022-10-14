@@ -23,7 +23,7 @@ class MoCo(nn.Module):
         self.r = r
         self.m = m
         self.T = T
-        self.T_soft = 0.7
+        self.T_soft = 0.9
 
         # create the encoders
         # num_classes is the output fc dimension
