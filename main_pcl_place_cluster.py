@@ -488,7 +488,7 @@ def run_kmeans(x, args):
         clus.niter = 20
         clus.nredo = 5
         clus.seed = seed
-        clus.max_points_per_centroid = 1000
+        clus.max_points_per_centroid = 2000
         clus.min_points_per_centroid = 10
 
         res = faiss.StandardGpuResources()
@@ -517,7 +517,7 @@ def run_kmeans(x, args):
                 d = (np.asarray(dist)**0.5).mean()/np.log(len(dist)+10)            
                 density[i] = d     
                 
-        #if cluster only has one point, use the max to estimate its concentration        
+        #if cluster only has one point, use the max to estimate its concentration
         dmax = density.max()
         for i,dist in enumerate(Dcluster):
             if len(dist)<=1:
