@@ -1187,7 +1187,7 @@ class HabitatRGBObjEvalDataset(data.Dataset):
     def pull_image(self, index):
         x = plt.imread(self.data_list[index])[...,:3]
         scene = self.data_list[index].split("/")[-2]
-        scene_idx = self.scenes.index(scene)
+        # scene_idx = self.scenes.index(scene)
         x_obj = joblib.load(self.data_list[index].replace('_rgb.png', '.dat.gz').replace('image', 'object'))
 
         x_obj_out = np.zeros((self.max_object, 4))
@@ -1200,4 +1200,4 @@ class HabitatRGBObjEvalDataset(data.Dataset):
             q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
         else:
             q = torch.tensor(x).permute(2,0,1).float()
-        return q, x_obj_out, x_obj_category_out, scene_idx
+        return q, x_obj_out, x_obj_category_out, index

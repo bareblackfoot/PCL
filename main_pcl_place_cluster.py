@@ -255,7 +255,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 cluster_result['density'].append(torch.zeros(int(num_cluster)).cuda()) 
 
             if args.gpu == 0:
-                features[torch.norm(features,dim=1)>1.5] /= 2 #account for the few samples that are computed twice  
+                features[torch.norm(features,dim=1)>1.5] /= 2. #account for the few samples that are computed twice
                 features = features.numpy()
                 cluster_result = run_kmeans(features,args)  #run kmeans clustering on master node
                 # save the clustering result
@@ -504,7 +504,7 @@ def run_kmeans(x, args):
         
         # get cluster centroids
         centroids = faiss.vector_to_array(clus.centroids).reshape(k,d)
-        
+        print('Effective number of clusters: {} of {}'.format(len(centroids[centroids.sum(-1) != 0]), len(centroids)))
         # sample-to-centroid distances for each cluster 
         Dcluster = [[] for c in range(k)]          
         for im,i in enumerate(im2cluster):
