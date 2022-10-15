@@ -1138,7 +1138,7 @@ class HabitatRGBObjDataset(data.Dataset):
         hist = self.hists[data_ii]
         similarity = -np.sum(hist[None] * np.log(hist[None] / (self.hists + 0.0001)),-1)
         cands = np.argsort(-similarity)[:100]
-        cands = cands[abs(cands - data_ii)>10000]
+        # cands = cands[abs(cands - data_ii)>10000]
         if len(cands) == 0:
             cands = np.argsort(-similarity)[:100]
         idx = cands[random.choices(np.arange(len(cands)))[0]]
