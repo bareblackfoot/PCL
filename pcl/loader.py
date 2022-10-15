@@ -1127,22 +1127,22 @@ class HabitatRGBObjDataset(data.Dataset):
         x_obj_out[:len(x_obj['bboxes'])] = x_obj['bboxes'][:self.max_object]
         x_obj_category_out[:len(x_obj['bbox_categories'])] = x_obj['bbox_categories'][:self.max_object]
 
-        # place = self.data_list[index].split("/")[-2]
-        # match_places = self.place_mapping[place]
-        # same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] in match_places]
-        # if len(same_place_list) > 1:
-        #     same_place_list.remove(self.data_list[index])
-        # idx = np.random.randint(len(same_place_list))
-        # sp_sample = same_place_list[idx]
-        data_ii = self.hists_datapath.index(self.data_list[index])
-        hist = self.hists[data_ii]
-        similarity = -np.sum(hist[None] * np.log(hist[None] / (self.hists + 0.0001)),-1)
-        cands = np.argsort(-similarity)[:100]
-        # cands = cands[abs(cands - data_ii)>10000]
-        if len(cands) == 0:
-            cands = np.argsort(-similarity)[:100]
-        idx = cands[random.choices(np.arange(len(cands)))[0]]
-        sp_sample = self.hists_datapath[idx]
+        place = self.data_list[index].split("/")[-2]
+        match_places = self.place_mapping[place]
+        same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] in match_places]
+        if len(same_place_list) > 1:
+            same_place_list.remove(self.data_list[index])
+        idx = np.random.randint(len(same_place_list))
+        sp_sample = same_place_list[idx]
+        # data_ii = self.hists_datapath.index(self.data_list[index])
+        # hist = self.hists[data_ii]
+        # similarity = -np.sum(hist[None] * np.log(hist[None] / (self.hists + 0.0001)),-1)
+        # cands = np.argsort(-similarity)[:100]
+        # # cands = cands[abs(cands - data_ii)>10000]
+        # if len(cands) == 0:
+        #     cands = np.argsort(-similarity)[:100]
+        # idx = cands[random.choices(np.arange(len(cands)))[0]]
+        # sp_sample = self.hists_datapath[idx]
         sp = plt.imread(sp_sample)[...,:3]
         sp_obj = joblib.load(sp_sample.replace('_rgb.png', '.dat.gz'))
         sp_obj_out = np.zeros((self.max_object, 4))
