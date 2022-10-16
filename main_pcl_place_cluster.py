@@ -409,8 +409,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         loss = criterion(output, target)  
 
         # Soft InfoNCE loss
-        # loss_soft = criterion(output_soft, target_soft)
-        # loss += loss_soft
+        loss_soft = criterion(output_soft, target_soft)
+        loss += loss_soft
         # loss = torch.where(torch.isnan(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
         # loss = torch.where(torch.isinf(loss), Variable(torch.zeros_like(loss), requires_grad=False).cuda(), loss)
 
