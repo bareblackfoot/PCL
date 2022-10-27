@@ -5,7 +5,8 @@ import random
 import cv2
 import matplotlib.pyplot as plt
 # mp3d_objectwise
-data_dir = "/disk3/nuri/mp3d_with_obj_pcl_data_v2"
+# data_dir = "/disk3/nuri/mp3d_with_obj_pcl_data_v2"
+data_dir = "/disk3/nuri/gibson_with_obj_pcl_data_v2"
 train_data_list = []
 data_dir = os.path.join(data_dir, "train")
 scenes = os.listdir(data_dir)
@@ -18,9 +19,10 @@ bbox_categories = {}
 bbox_hist = {}
 for train_data in tqdm(train_data_list):
     x_obj = joblib.load(train_data.replace('_rgb.png', '.dat.gz'))['bbox_categories']
-    hist, _ = np.histogram(x_obj, bins=40, range=(0,40))
-    hist += 1
-    hist = hist / np.sum(hist)
+    x_obj = np.unique(x_obj)
+    hist, _ = np.histogram(x_obj, bins=80, range=(0,80))
+    # hist += 1
+    hist = hist / np.maximum(np.sum(hist), 1)
     bbox_categories[train_data] = x_obj
     bbox_hist[train_data] = hist
 hists = np.stack(bbox_hist.values())

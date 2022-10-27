@@ -1051,7 +1051,7 @@ class AI2ThorObjectEvalDataset(data.Dataset):
 
 
 class HabitatRGBObjDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None, noisydepth=False):
+    def __init__(self, data_list, base_transform=None, noisydepth=False, objwise=False):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
@@ -1063,24 +1063,26 @@ class HabitatRGBObjDataset(data.Dataset):
             hists['data_path'][i] = os.path.join("/".join(data_list[0].split("/")[:-5]), "/".join(hist_path.split("/")[-5:]))
         self.hists_datapath = hists['data_path']
         self.num_camera = 12
-        self.unique_places = ['']
-        self.place_mapping = {
-            'living room': ['living room'],
-            # 'familyroom_lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
-            # 'lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
-            'tv': ['tv'],
-            'bedroom': ['bedroom'],
-            'kitchen': ['kitchen'],
-            'closet': ['closet'],
-            'dining room': ['dining room', 'dining booth'],
-            'dining booth': ['dining room', 'dining booth'],
-            'bathroom': ['bathroom'],
-            'toilet': ['toilet'],
-            'hallway': ['hallway'],
-            # 'office': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
-            # 'classroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
-            # 'meetingroom_conferenceroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
-            # 'library': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+        self.objwise = objwise
+        if not objwise:
+            self.unique_places = ['']
+            self.place_mapping = {
+                'living room': ['living room'],
+                # 'familyroom_lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+                # 'lounge': ['living room', 'familyroom_lounge', 'lounge', 'tv'],
+                'tv': ['tv'],
+                'bedroom': ['bedroom'],
+                'kitchen': ['kitchen'],
+                'closet': ['closet'],
+                'dining room': ['dining room', 'dining booth'],
+                'dining booth': ['dining room', 'dining booth'],
+                'bathroom': ['bathroom'],
+                'toilet': ['toilet'],
+                'hallway': ['hallway'],
+                # 'office': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+                # 'classroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+                # 'meetingroom_conferenceroom': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
+                # 'library': ['office', 'classroom', 'meetingroom_conferenceroom', 'library'],
             }
 
     def __getitem__(self, index):
@@ -1128,21 +1130,23 @@ class HabitatRGBObjDataset(data.Dataset):
         x_obj_category_out[:len(x_obj['bbox_categories'])] = x_obj['bbox_categories'][:self.max_object]
 
         place = self.data_list[index].split("/")[-2]
-        match_places = self.place_mapping[place]
-        same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] in match_places]
-        if len(same_place_list) > 1:
-            same_place_list.remove(self.data_list[index])
-        idx = np.random.randint(len(same_place_list))
-        sp_sample = same_place_list[idx]
-        # data_ii = self.hists_datapath.index(self.data_list[index])
-        # hist = self.hists[data_ii]
-        # similarity = -np.sum(hist[None] * np.log(hist[None] / (self.hists + 0.0001)),-1)
-        # cands = np.argsort(-similarity)[:100]
-        # # cands = cands[abs(cands - data_ii)>10000]
-        # if len(cands) == 0:
-        #     cands = np.argsort(-similarity)[:100]
-        # idx = cands[random.choices(np.arange(len(cands)))[0]]
-        # sp_sample = self.hists_datapath[idx]
+        if self.objwise:
+            data_ii = self.hists_datapath.index(self.data_list[index])
+            hist = self.hists[data_ii]
+            similarity = -np.sum(hist[None] * np.log((hist[None] + 0.0001) / (self.hists + 0.0001)),-1)
+            cands = np.argsort(-similarity)[:100]
+            # cands = cands[abs(cands - data_ii)>10000]
+            if len(cands) == 0:
+                cands = np.argsort(-similarity)[:100]
+            idx = cands[random.choices(np.arange(len(cands)))[0]]
+            sp_sample = self.hists_datapath[idx]
+        else:
+            match_places = self.place_mapping[place]
+            same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] in match_places]
+            if len(same_place_list) > 1:
+                same_place_list.remove(self.data_list[index])
+            idx = np.random.randint(len(same_place_list))
+            sp_sample = same_place_list[idx]
         sp = plt.imread(sp_sample)[...,:3]
         sp_obj = joblib.load(sp_sample.replace('_rgb.png', '.dat.gz'))
         sp_obj_out = np.zeros((self.max_object, 4))
@@ -1171,12 +1175,13 @@ class HabitatRGBObjDataset(data.Dataset):
 
 
 class HabitatRGBObjEvalDataset(data.Dataset):
-    def __init__(self, data_list, base_transform=None, noisydepth=False):
+    def __init__(self, data_list, base_transform=None, noisydepth=False, objwise=False):
         self.data_list = data_list
         self.base_transform = base_transform
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
         self.max_object = 10
+        self.objwise = objwise
 
     def __getitem__(self, index):
         return self.pull_image(index)

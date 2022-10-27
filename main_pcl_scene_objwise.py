@@ -289,19 +289,21 @@ def main_worker(gpu, ngpus_per_node, args):
     data_dir = os.path.join(args.data, "train")
     scenes = os.listdir(data_dir)
     for scene in scenes:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/*_rgb.png"))
+        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/unknown/*_rgb.png"))
         # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
         # places = glob.glob(os.path.join(data_dir, scene) + "/*")
         # for place in places:
         # train_data_list.extend(glob.glob(place + "/*_rgb.png"))
-    train_dataset = pcl.loader.HabitatSemObjwiseDataset(
+    train_dataset = pcl.loader.HabitatRGBObjDataset(
         train_data_list,
         transforms.Compose(augmentation),
-        args.noisydepth)
-    eval_dataset = pcl.loader.HabitatSemObjwiseEvalDataset(
+        args.noisydepth,
+        objwise=True)
+    eval_dataset = pcl.loader.HabitatRGBObjEvalDataset(
         train_data_list,
         eval_augmentation,
-        args.noisydepth)
+        args.noisydepth,
+        objwise=True)
     print(len(train_data_list))
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -379,21 +381,29 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
     model.train()
 
     end = time.time()
-    for i, (images, index) in enumerate(train_loader):
+    for i, (images, objects, object_categories, index) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         if args.gpu is not None:
-            images[0] = images[0].cuda(args.gpu, non_blocking=True)
-            images[1] = images[1].cuda(args.gpu, non_blocking=True)
-            images[2] = images[2].cuda(args.gpu, non_blocking=True)
+            images[0] = images[0].cuda(args.gpu, non_blocking=True) # q
+            images[1] = images[1].cuda(args.gpu, non_blocking=True) #k1
+            images[2] = images[2].cuda(args.gpu, non_blocking=True) #k2
+            objects[0] = objects[0].cuda(args.gpu, non_blocking=True) # q
+            objects[1] = objects[1].cuda(args.gpu, non_blocking=True) #k1
+            objects[2] = objects[2].cuda(args.gpu, non_blocking=True) #k2
+            object_categories[0] = object_categories[0].cuda(args.gpu, non_blocking=True).long() # q
+            object_categories[1] = object_categories[1].cuda(args.gpu, non_blocking=True).long() #k1
+            object_categories[2] = object_categories[2].cuda(args.gpu, non_blocking=True).long() #k2
             # scene_idx = scene_idx.cuda(args.gpu, non_blocking=True)
             # if epoch < args.warmup_epoch:
             #     scene_idx = torch.zeros_like(scene_idx).cuda(args.gpu, non_blocking=True)
 
-        # compute output
-        output, target, output_soft, target_soft, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2], cluster_result=cluster_result, index=index)  # im_n=images[2], output_adv, target_adv,
-
+        # compute output query(q), same_place_rot(soft), same_place(k)
+        output, target, output_soft, target_soft, output_proto, target_proto = model(im_q=images[0], im_soft=images[1], im_k=images[2],
+                                                                                     obj_q=objects[0], obj_soft=objects[1], obj_k=objects[2],
+                                                                                     cat_q=object_categories[0], cat_soft=object_categories[1], cat_k=object_categories[2],
+                                                                                     cluster_result=cluster_result, index=index) # im_n=images[2], output_adv, target_adv,
         # InfoNCE loss
         loss = criterion(output, target)
 
@@ -436,17 +446,19 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
         if i % args.print_freq == 0:
             progress.display(i)
 
-            
+
 def compute_features(eval_loader, model, args):
     print('Computing features...')
     model.eval()
-    features = torch.zeros(len(eval_loader.dataset),args.low_dim).cuda()
-    for i, (images, index, _) in enumerate(tqdm(eval_loader)):
+    features = torch.zeros(len(eval_loader.dataset), args.low_dim).cuda()
+    for i, (images, objects, categories, index) in enumerate(tqdm(eval_loader)):
         with torch.no_grad():
             images = images.cuda(non_blocking=True)
-            feat = model(images,is_eval=True) 
+            objects = objects.cuda(non_blocking=True)
+            categories = categories.cuda(non_blocking=True).long()
+            feat = model(images, objects, categories, is_eval=True)
             features[index] = feat
-    dist.barrier()        
+    dist.barrier()
     dist.all_reduce(features, op=dist.ReduceOp.SUM)     
     return features.cpu()
 
