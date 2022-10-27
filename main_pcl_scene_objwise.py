@@ -336,7 +336,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 features = features.numpy()
                 cluster_result = run_kmeans(features,args)  #run kmeans clustering on master node
                 # save the clustering result
-                # torch.save(cluster_result,os.path.join(args.exp_dir, 'clusters_%d'%epoch))  
+                torch.save(cluster_result,os.path.join(args.exp_dir, 'clusters_%d'%epoch))
                 
             dist.barrier()  
             # broadcast clustering result
