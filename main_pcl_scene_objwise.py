@@ -26,6 +26,8 @@ import torchvision.models as models
 import pcl.loader
 import pcl.builder_sem
 import glob
+import pcl.loader
+import pcl.builder_place
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -177,18 +179,10 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    # if args.noisydepth:
-    #     from resnet_pcl import resnet18
-    #     model = pcl.builder.MoCo(
-    #         resnet18,
-    #         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
-    # else:
-    model = pcl.builder_sem.MoCo(
-        models.__dict__[args.arch],
+    from resnet_place_pcl import resnet18
+    model = pcl.builder_place.MoCo(
+        resnet18,
         args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
-    # model = pcl.builder.MoCo(
-    #     resnet18,
-    #     args.low_dim, args.pcl_r, args.moco_m, args.temperature, args.mlp)
 
     print(model)
 
