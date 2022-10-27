@@ -296,7 +296,7 @@ class ResNet(nn.Module):
         x_obj = torch.flatten(x_obj, 1)
         x_obj = self.fc_obj(x_obj)
         try:
-            obj_category = self.cat_embed(torch.clip(rois_category, 0, 80))
+            obj_category = self.cat_embed(torch.clip(rois_category, 0, 79))
         except:
             obj_category = self.cat_embed(rois_category)
         x_obj = self.concat_cat(torch.cat([x_obj.reshape(B, NO, -1), obj_category], -1))
