@@ -99,6 +99,7 @@ parser.add_argument('--aug-plus', action='store_true',
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
+parser.add_argument('--num-data', default=100000, type=int)
 parser.add_argument('--num-cluster', default='25000,50000,100000', type=str,
 # parser.add_argument('--num-cluster', default='1000,2000,4000', type=str,
                     help='number of clusters')
@@ -244,78 +245,79 @@ def main_worker(gpu, ngpus_per_node, args):
     # Data loading code
     # traindir =args.data
     # traindir = os.path.join(args.data, 'train')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    
-    if args.aug_plus:
-        # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
-        augmentation = [
-            transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-            ], p=0.8),
-            # transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]
-    else:
-        # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
-        augmentation = [
-            # transforms.RandomGrayscale(p=0.2),
-            transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize
-        ]
-
-    # center-crop augmentation 
-    eval_augmentation = transforms.Compose([
-        transforms.ToTensor(),
-        normalize
-        ])
-    # "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
-
-    train_data_list = []
-    # if "mp3" in args.data:
-    #     data_dir = args.data
+    # normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    #                                  std=[0.229, 0.224, 0.225])
+    #
+    # if args.aug_plus:
+    #     # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
+    #     augmentation = [
+    #         transforms.RandomApply([
+    #             transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
+    #         ], p=0.8),
+    #         # transforms.RandomGrayscale(p=0.2),
+    #         transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         normalize
+    #     ]
     # else:
-    data_dir = os.path.join(args.data, "train")
-    scenes = os.listdir(data_dir)
-    for scene in scenes:
-        train_data_list.extend(glob.glob(f"{data_dir}/{scene}/unknown/*_rgb.png"))
-        # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
-        # places = glob.glob(os.path.join(data_dir, scene) + "/*")
-        # for place in places:
-        # train_data_list.extend(glob.glob(place + "/*_rgb.png"))
-    train_dataset = pcl.loader.HabitatRGBObjDataset(
-        train_data_list,
-        transforms.Compose(augmentation),
-        args.noisydepth,
-        objwise=True)
-    eval_dataset = pcl.loader.HabitatRGBObjEvalDataset(
-        train_data_list,
-        eval_augmentation,
-        args.noisydepth,
-        objwise=True)
-    print(len(train_data_list))
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-        eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
-    else:
-        train_sampler = None
-        eval_sampler = None
-
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
-    
-    # dataloader for center-cropped images, use larger batch size to increase speed
-    eval_loader = torch.utils.data.DataLoader(
-        eval_dataset, batch_size=args.batch_size*5, shuffle=False,
-        sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
-    
+    #     # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
+    #     augmentation = [
+    #         # transforms.RandomGrayscale(p=0.2),
+    #         transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         normalize
+    #     ]
+    #
+    # # center-crop augmentation
+    # eval_augmentation = transforms.Compose([
+    #     transforms.ToTensor(),
+    #     normalize
+    #     ])
+    # "/home/blackfoot/codes/Object-Graph-Memory/IL_data/pcl_gibson"
+    #
+    # train_data_list = []
+    # # if "mp3" in args.data:
+    # #     data_dir = args.data
+    # # else:
+    # data_dir = os.path.join(args.data, "train")
+    # scenes = os.listdir(data_dir)
+    # for scene in scenes:
+    #     train_data_list.extend(glob.glob(f"{data_dir}/{scene}/unknown/*_rgb.png"))
+    #     # train_data_list = [os.path.join(data_dir, 'train', x) for x in sorted(os.listdir(os.path.join(data_dir, 'train')))]#[:10000]
+    #     # places = glob.glob(os.path.join(data_dir, scene) + "/*")
+    #     # for place in places:
+    #     # train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+    # train_dataset = pcl.loader.HabitatRGBObjDataset(
+    #     train_data_list,
+    #     transforms.Compose(augmentation),
+    #     args.noisydepth,
+    #     objwise=True)
+    # eval_dataset = pcl.loader.HabitatRGBObjEvalDataset(
+    #     train_data_list,
+    #     eval_augmentation,
+    #     args.noisydepth,
+    #     objwise=True)
+    # print(len(train_data_list))
+    # if args.distributed:
+    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    #     eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset,shuffle=False)
+    # else:
+    #     train_sampler = None
+    #     eval_sampler = None
+    #
+    # train_loader = torch.utils.data.DataLoader(
+    #     train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+    #     num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+    #
+    # # dataloader for center-cropped images, use larger batch size to increase speed
+    # eval_loader = torch.utils.data.DataLoader(
+    #     eval_dataset, batch_size=args.batch_size*5, shuffle=False,
+    #     sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
+    #
     for epoch in range(args.start_epoch, args.epochs):
+        train_loader, eval_loader, train_sampler, eval_sampler, train_dataset, eval_dataset = get_loader(args)
         cluster_result = None
         if epoch>=args.warmup_epoch:
             # compute momentum features for center-cropped images
@@ -439,6 +441,78 @@ def train(train_loader, model, criterion, optimizer, epoch, args, cluster_result
 
         if i % args.print_freq == 0:
             progress.display(i)
+
+
+
+def get_loader(args):
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+
+    if args.aug_plus:
+        # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
+        augmentation = [
+            transforms.RandomApply([
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
+            ], p=0.8),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.RandomApply([pcl.loader.GaussianBlur([.1, 2.])], p=0.5),
+            transforms.ToTensor(),
+            normalize
+        ]
+    else:
+        # MoCo v1's aug: same as InstDisc https://arxiv.org/abs/1805.01978
+        augmentation = [
+            transforms.RandomGrayscale(p=0.2),
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
+            transforms.ToTensor(),
+            normalize
+        ]
+
+    # center-crop augmentation
+    eval_augmentation = transforms.Compose([
+        transforms.ToTensor(),
+        normalize
+    ])
+
+    train_data_list = []
+    data_dir = os.path.join(args.data, "train")
+
+    scenes = os.listdir(data_dir)
+    for scene in scenes:
+        places = glob.glob(os.path.join(data_dir, scene) + "/*")
+        for place in places:
+            train_data_list.extend(glob.glob(place + "/*_rgb.png"))
+
+    train_data_list = random.sample(train_data_list, np.minimum(args.num_data, len(train_data_list)))
+    print(len(train_data_list))
+
+    train_dataset = pcl.loader.HabitatRGBObjDataset(
+        train_data_list,
+        transforms.Compose(augmentation),
+        args.noisydepth,
+        objwise=True)
+    eval_dataset = pcl.loader.HabitatRGBObjEvalDataset(
+        train_data_list,
+        eval_augmentation,
+        args.noisydepth,
+        objwise=True)
+
+    if args.distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset, shuffle=False)
+    else:
+        train_sampler = None
+        eval_sampler = None
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+        num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+
+    # dataloader for center-cropped images, use larger batch size to increase speed
+    eval_loader = torch.utils.data.DataLoader(
+        eval_dataset, batch_size=args.batch_size * 5, shuffle=False,
+        sampler=eval_sampler, num_workers=args.workers, pin_memory=True)
+    return train_loader, eval_loader, train_sampler, eval_sampler, train_dataset, eval_dataset
 
 
 def compute_features(eval_loader, model, args):
