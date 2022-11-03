@@ -1134,10 +1134,10 @@ class HabitatRGBObjDataset(data.Dataset):
             data_ii = self.hists_datapath.index(self.data_list[index])
             hist = self.hists[data_ii]
             similarity = -np.sum(hist[None] * np.log((hist[None] + 0.0001) / (self.hists + 0.0001)),-1)
-            cands = np.argsort(-similarity)[:100]
+            cands = np.argsort(-similarity)[:30]
             # cands = cands[abs(cands - data_ii)>10000]
-            if len(cands) == 0:
-                cands = np.argsort(-similarity)[:100]
+            # if len(cands) == 0:
+            #     cands = np.argsort(-similarity)[:100]
             idx = cands[random.choices(np.arange(len(cands)))[0]]
             sp_sample = self.hists_datapath[idx]
         else:
