@@ -1,13 +1,17 @@
-from PIL import ImageFilter
+import glob
+import os
 import random
-import torchvision.datasets as datasets
-import torch.utils.data as data
+
+import cv2
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import joblib, glob, os
-import cv2
+import torch.utils.data as data
+import torchvision.datasets as datasets
 from PIL import Image
+from PIL import ImageFilter
+
 with open(os.path.join(os.path.dirname(__file__), "data/coco_category.txt"), "r") as f:
     lines = f.readlines()
 DETECTION_CATEGORIES = [line.rstrip() for line in lines]
@@ -89,14 +93,14 @@ class GaussianBlur(object):
         sigma = random.uniform(self.sigma[0], self.sigma[1])
         x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
         return x
-    
+
 
 class ImageFolderInstance(datasets.ImageFolder):
     def __getitem__(self, index):
         path, target = self.samples[index]
         sample = self.loader(path)
         if self.transform is not None:
-            sample = self.transform(sample)           
+            sample = self.transform(sample)
         return sample, index
 
 
@@ -147,7 +151,6 @@ class HabitatVideoDataset(data.Dataset):
         mask_q = torch.tensor(mask_q).float()
         mask_k = torch.tensor(mask_k).float()
         return [q, k], [mask_q, mask_k], index, scene_idx
-
 
     # def pull_image(self, index):
     #     imgs = os.listdir(self.data_list[index])
@@ -230,7 +233,6 @@ class HabitatVideoEvalDataset(data.Dataset):
     #     return q, index
 
 
-
 class HabitatImageDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
         self.data_list = data_list
@@ -238,7 +240,7 @@ class HabitatImageDataset(data.Dataset):
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
         # self.places = sorted(np.unique([self.data_list[i].split("/")[-2] for i in range(len(self.data_list))]))
-        self.places = ["kitchen", "bedroom", "bathroom","closet", "living room"]
+        self.places = ["kitchen", "bedroom", "bathroom", "closet", "living room"]
         # data_dir = "/".join(self.data_list[0].split("/")[:-3]).replace("val", "train")
         # scenes = os.listdir(data_dir)
         # places = []
@@ -271,20 +273,21 @@ class HabitatImageDataset(data.Dataset):
         idx = np.random.randint(len(scene_data_list))
         negative_sample = scene_data_list[idx]
         n = plt.imread(negative_sample)
-        n = torch.tensor(n[...,:3]).permute(2,0,1)
+        n = torch.tensor(n[..., :3]).permute(2, 0, 1)
 
         x = plt.imread(self.data_list[index])
         x_aug = self.augment(x)
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray((x[...,:3]*255.).astype(np.uint8)))
-            k = self.base_transform(Image.fromarray((x_aug[...,:3]*255.).astype(np.uint8)))
+            q = self.base_transform(Image.fromarray((x[..., :3] * 255.).astype(np.uint8)))
+            k = self.base_transform(Image.fromarray((x_aug[..., :3] * 255.).astype(np.uint8)))
         else:
-            q = torch.tensor(x[...,:3]).permute(2,0,1)
-            k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+            q = torch.tensor(x[..., :3]).permute(2, 0, 1)
+            k = torch.tensor(x_aug[..., :3]).permute(2, 0, 1)
         if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-            k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
+            q = torch.cat([q, torch.tensor(x[..., -1:]).permute(2, 0, 1)], 0)
+            k = torch.cat([k, torch.tensor(x_aug[..., -1:]).permute(2, 0, 1)], 0)
         return [q, k, n], index, scene_idx, place_idx
+
 
 class HabitatImageEvalDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
@@ -300,7 +303,7 @@ class HabitatImageEvalDataset(data.Dataset):
         #     places.append(glob.glob(os.path.join(data_dir, scene) + "/*"))
         # places = np.concatenate(places)
         # self.places = sorted(np.unique([places[i].split("/")[-1] for i in range(len(places))]))
-        self.places = ["kitchen", "bedroom", "bathroom","closet", "living room"]
+        self.places = ["kitchen", "bedroom", "bathroom", "closet", "living room"]
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -315,11 +318,11 @@ class HabitatImageEvalDataset(data.Dataset):
         place_idx = self.places.index(place)
         x = plt.imread(self.data_list[index])
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray((x[...,:3]*255.).astype(np.uint8)))
+            q = self.base_transform(Image.fromarray((x[..., :3] * 255.).astype(np.uint8)))
         else:
-            q = torch.tensor(x[...,:3]).permute(2,0,1)
+            q = torch.tensor(x[..., :3]).permute(2, 0, 1)
         if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            q = torch.cat([q, torch.tensor(x[..., -1:]).permute(2, 0, 1)], 0)
         return q, index, scene_idx, place_idx
 
 
@@ -361,13 +364,13 @@ class HabitatImageSemDataset(data.Dataset):
         idx = np.random.randint(len(same_place_list))
         sp_sample = same_place_list[idx]
         sp = plt.imread(sp_sample)
-        sp_sem_ = cv2.imread(sp_sample.replace("rgb", "sem"))[...,0:1]
+        sp_sem_ = cv2.imread(sp_sample.replace("rgb", "sem"))[..., 0:1]
         sp_sem = Image.new(
             "P", (sp_sem_.shape[1], sp_sem_.shape[0])
         )
         sp_sem.putpalette(d3_40_colors_rgb.flatten())
         sp_sem.putdata((sp_sem_.flatten() % 40).astype(np.uint8))
-        sp_sem = np.array(sp_sem.convert("RGBA"))[...,:3]/255.
+        sp_sem = np.array(sp_sem.convert("RGBA"))[..., :3] / 255.
         # sp = torch.tensor(np.concatenate([sp[...,:3], semantic_img], -1)).permute(2,0,1).float()
 
         scene_data_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-3] == scene]
@@ -375,34 +378,34 @@ class HabitatImageSemDataset(data.Dataset):
         idx = np.random.randint(len(scene_data_list))
         negative_sample = scene_data_list[idx]
         n = plt.imread(negative_sample)
-        n_sem_ = cv2.imread(negative_sample.replace("rgb", "sem"))[...,0:1]
+        n_sem_ = cv2.imread(negative_sample.replace("rgb", "sem"))[..., 0:1]
         n_sem = Image.new(
             "P", (n_sem_.shape[1], n_sem_.shape[0])
         )
         n_sem.putpalette(d3_40_colors_rgb.flatten())
         n_sem.putdata((n_sem_.flatten() % 40).astype(np.uint8))
-        n_sem = np.array(n_sem.convert("RGBA"))[...,:3]/255.
+        n_sem = np.array(n_sem.convert("RGBA"))[..., :3] / 255.
         # n = torch.tensor(np.concatenate([n[...,:3], semantic_img], -1)).permute(2,0,1).float()
 
         x = plt.imread(self.data_list[index])
 
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[..., 0:1]
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        semantic_img = np.array(semantic_img.convert("RGBA"))[..., :3] / 255.
         x_aug, x_aug_sem = self.augment(x, semantic_img)
         if self.base_transform is not None:
-            q_rgb = self.base_transform(Image.fromarray((x[...,:3]*255.).astype(np.uint8)))
-            q_sem = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
-            k = self.base_transform(Image.fromarray((x_aug[...,:3]*255.).astype(np.uint8)))
-            k_sem = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
-            n = self.base_transform(Image.fromarray((n[...,:3]*255.).astype(np.uint8)))
-            n_sem = self.base_transform(Image.fromarray((n_sem*255.).astype(np.uint8)))
-            sp = self.base_transform(Image.fromarray((sp[...,:3]*255.).astype(np.uint8)))
-            sp_sem = self.base_transform(Image.fromarray((sp_sem*255.).astype(np.uint8)))
+            q_rgb = self.base_transform(Image.fromarray((x[..., :3] * 255.).astype(np.uint8)))
+            q_sem = self.base_transform(Image.fromarray((semantic_img * 255.).astype(np.uint8)))
+            k = self.base_transform(Image.fromarray((x_aug[..., :3] * 255.).astype(np.uint8)))
+            k_sem = self.base_transform(Image.fromarray((x_aug_sem * 255.).astype(np.uint8)))
+            n = self.base_transform(Image.fromarray((n[..., :3] * 255.).astype(np.uint8)))
+            n_sem = self.base_transform(Image.fromarray((n_sem * 255.).astype(np.uint8)))
+            sp = self.base_transform(Image.fromarray((sp[..., :3] * 255.).astype(np.uint8)))
+            sp_sem = self.base_transform(Image.fromarray((sp_sem * 255.).astype(np.uint8)))
             q = torch.cat([q_rgb, q_sem], 0)
             k = torch.cat([k, k_sem], 0)
             n = torch.cat([n, n_sem], 0)
@@ -410,10 +413,10 @@ class HabitatImageSemDataset(data.Dataset):
         else:
             # q = torch.tensor(x[...,:3]).permute(2,0,1)
             # k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
-            q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
-            k = torch.tensor(np.concatenate([x_aug[...,:3], x_aug_sem], -1)).permute(2,0,1).float()
-            n = torch.tensor(np.concatenate([n[...,:3], n_sem], -1)).permute(2,0,1).float()
-            sp = torch.tensor(np.concatenate([sp[...,:3], sp_sem], -1)).permute(2,0,1).float()
+            q = torch.tensor(np.concatenate([x[..., :3], semantic_img], -1)).permute(2, 0, 1).float()
+            k = torch.tensor(np.concatenate([x_aug[..., :3], x_aug_sem], -1)).permute(2, 0, 1).float()
+            n = torch.tensor(np.concatenate([n[..., :3], n_sem], -1)).permute(2, 0, 1).float()
+            sp = torch.tensor(np.concatenate([sp[..., :3], sp_sem], -1)).permute(2, 0, 1).float()
         return [q, k, n, sp], index, scene_idx, place_idx
 
 
@@ -434,20 +437,21 @@ class HabitatImageSemEvalDataset(data.Dataset):
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
         x = plt.imread(self.data_list[index])
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[..., 0:1]
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        semantic_img = np.array(semantic_img.convert("RGBA"))[..., :3] / 255.
         if self.base_transform is not None:
-            q_rgb = self.base_transform(Image.fromarray((x[...,:3]*255.).astype(np.uint8)))
-            q_sem = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
+            q_rgb = self.base_transform(Image.fromarray((x[..., :3] * 255.).astype(np.uint8)))
+            q_sem = self.base_transform(Image.fromarray((semantic_img * 255.).astype(np.uint8)))
             q = torch.cat([q_rgb, q_sem], 0)
         else:
-            q = torch.tensor(np.concatenate([x[...,:3], semantic_img], -1)).permute(2,0,1).float()
+            q = torch.tensor(np.concatenate([x[..., :3], semantic_img], -1)).permute(2, 0, 1).float()
         return q, index, scene_idx
+
 
 #
 # class HabitatImageSemDataset(data.Dataset):
@@ -552,14 +556,14 @@ class HabitatSemDataset(data.Dataset):
         self.noisydepth = noisydepth
         self.scenes = sorted(np.unique([self.data_list[i].split("/")[-3] for i in range(len(self.data_list))]))
         COI = ['chair', 'door', 'table', 'picture', 'cabinet', 'cushion', 'window', 'sofa',
-                   'bed', 'curtain', 'chest_of_drawers', 'plant', 'sink', 'stairs',  'toilet', 'stool', 'towel',
-                   'mirror', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace',
-                   'shelving', 'blinds', 'gym_equipment', 'seating', 'board', 'furniture', 'appliances', 'clothes', 'objects']
+               'bed', 'curtain', 'chest_of_drawers', 'plant', 'sink', 'stairs', 'toilet', 'stool', 'towel',
+               'mirror', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace',
+               'shelving', 'blinds', 'gym_equipment', 'seating', 'board', 'furniture', 'appliances', 'clothes', 'objects']
         self.COI_INDEX = np.where([c in COI for c in CATEGORIES['mp3d']])[0]
         self.d3_40_colors_rgb = d3_40_colors_rgb.copy()
         for idx in range(40):
             if idx not in self.COI_INDEX:
-                self.d3_40_colors_rgb[idx] = np.array([0,0,0])
+                self.d3_40_colors_rgb[idx] = np.array([0, 0, 0])
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -577,13 +581,13 @@ class HabitatSemDataset(data.Dataset):
         return augmented_sem
 
     def pull_image(self, index):
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[..., 0:1]
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
         semantic_img.putpalette(self.d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        semantic_img = np.array(semantic_img.convert("RGBA"))[..., :3] / 255.
 
         place = self.data_list[index].split("/")[-2]
         same_place_list = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == place]
@@ -592,24 +596,24 @@ class HabitatSemDataset(data.Dataset):
         idx = np.random.randint(len(same_place_list))
         sp_sample = same_place_list[idx]
         # sp = plt.imread(sp_sample)
-        sp_sem_ = cv2.imread(sp_sample.replace("rgb", "sem"))[...,0:1]
+        sp_sem_ = cv2.imread(sp_sample.replace("rgb", "sem"))[..., 0:1]
         sp_sem = Image.new(
             "P", (sp_sem_.shape[1], sp_sem_.shape[0])
         )
         sp_sem.putpalette(self.d3_40_colors_rgb.flatten())
         sp_sem.putdata((sp_sem_.flatten() % 40).astype(np.uint8))
-        sp_sem = np.array(sp_sem.convert("RGBA"))[...,:3]/255.
+        sp_sem = np.array(sp_sem.convert("RGBA"))[..., :3] / 255.
         x_aug_sem = self.augment(sp_sem)
 
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
-            k1 = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
-            k2 = self.base_transform(Image.fromarray((sp_sem*255.).astype(np.uint8)))
+            q = self.base_transform(Image.fromarray((semantic_img * 255.).astype(np.uint8)))
+            k1 = self.base_transform(Image.fromarray((x_aug_sem * 255.).astype(np.uint8)))
+            k2 = self.base_transform(Image.fromarray((sp_sem * 255.).astype(np.uint8)))
             # n = self.base_transform(Image.fromarray((n_sem_img*255.).astype(np.uint8)))
         else:
-            q = torch.tensor(semantic_img).permute(2,0,1).float()
-            k1 = torch.tensor(x_aug_sem).permute(2,0,1).float()
-            k2 = torch.tensor(sp_sem).permute(2,0,1).float()
+            q = torch.tensor(semantic_img).permute(2, 0, 1).float()
+            k1 = torch.tensor(x_aug_sem).permute(2, 0, 1).float()
+            k2 = torch.tensor(sp_sem).permute(2, 0, 1).float()
             # n = torch.tensor(n_sem_img).permute(2,0,1).float()
         return [q, k1, k2], index
 
@@ -630,14 +634,14 @@ class HabitatSemEvalDataset(data.Dataset):
     def pull_image(self, index):
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[..., 0:1]
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        q = torch.tensor(semantic_img).permute(2,0,1).float()
+        semantic_img = np.array(semantic_img.convert("RGBA"))[..., :3] / 255.
+        q = torch.tensor(semantic_img).permute(2, 0, 1).float()
         return q, index, scene_idx
 
 
@@ -653,14 +657,14 @@ class HabitatSemObjwiseDataset(data.Dataset):
             self.same_place_dict[object] = [self.data_list[i] for i in range(len(self.data_list)) if self.data_list[i].split("/")[-2] == object]
 
         COI = ['chair', 'door', 'table', 'picture', 'cabinet', 'cushion', 'window', 'sofa',
-                   'bed', 'curtain', 'chest_of_drawers', 'plant', 'sink', 'stairs',  'toilet', 'stool', 'towel',
-                   'mirror', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace',
-                   'shelving', 'blinds', 'gym_equipment', 'seating', 'board', 'furniture', 'appliances', 'clothes', 'objects']
+               'bed', 'curtain', 'chest_of_drawers', 'plant', 'sink', 'stairs', 'toilet', 'stool', 'towel',
+               'mirror', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace',
+               'shelving', 'blinds', 'gym_equipment', 'seating', 'board', 'furniture', 'appliances', 'clothes', 'objects']
         self.COI_INDEX = np.where([c in COI for c in CATEGORIES['mp3d']])[0]
         self.d3_40_colors_rgb = d3_40_colors_rgb.copy()
         for idx in range(40):
             if idx not in self.COI_INDEX:
-                self.d3_40_colors_rgb[idx] = np.array([0,0,0])
+                self.d3_40_colors_rgb[idx] = np.array([0, 0, 0])
 
     def __getitem__(self, index):
         return self.pull_image(index)
@@ -678,13 +682,13 @@ class HabitatSemObjwiseDataset(data.Dataset):
         return augmented_sem
 
     def pull_image(self, index):
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[..., 0:1]
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
         semantic_img.putpalette(self.d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten()).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
+        semantic_img = np.array(semantic_img.convert("RGBA"))[..., :3] / 255.
         semantic_img = self.augment(semantic_img)
 
         common_obj = self.data_list[index].split("/")[-2]
@@ -694,24 +698,24 @@ class HabitatSemObjwiseDataset(data.Dataset):
         idx = np.random.randint(len(same_place_list))
         sp_sample = same_place_list[idx]
         # sp = plt.imread(sp_sample)
-        sp_sem_ = cv2.imread(sp_sample.replace("rgb", "sem"))[...,0:1]
+        sp_sem_ = cv2.imread(sp_sample.replace("rgb", "sem"))[..., 0:1]
         sp_sem = Image.new(
             "P", (sp_sem_.shape[1], sp_sem_.shape[0])
         )
         sp_sem.putpalette(self.d3_40_colors_rgb.flatten())
         sp_sem.putdata((sp_sem_.flatten() % 40).astype(np.uint8))
-        sp_sem = np.array(sp_sem.convert("RGBA"))[...,:3]/255.
+        sp_sem = np.array(sp_sem.convert("RGBA"))[..., :3] / 255.
         x_aug_sem = self.augment(sp_sem)
 
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray((semantic_img*255.).astype(np.uint8)))
-            k1 = self.base_transform(Image.fromarray((x_aug_sem*255.).astype(np.uint8)))
-            k2 = self.base_transform(Image.fromarray((sp_sem*255.).astype(np.uint8)))
+            q = self.base_transform(Image.fromarray((semantic_img * 255.).astype(np.uint8)))
+            k1 = self.base_transform(Image.fromarray((x_aug_sem * 255.).astype(np.uint8)))
+            k2 = self.base_transform(Image.fromarray((sp_sem * 255.).astype(np.uint8)))
             # n = self.base_transform(Image.fromarray((n_sem_img*255.).astype(np.uint8)))
         else:
-            q = torch.tensor(semantic_img).permute(2,0,1).float()
-            k1 = torch.tensor(x_aug_sem).permute(2,0,1).float()
-            k2 = torch.tensor(sp_sem).permute(2,0,1).float()
+            q = torch.tensor(semantic_img).permute(2, 0, 1).float()
+            k1 = torch.tensor(x_aug_sem).permute(2, 0, 1).float()
+            k2 = torch.tensor(sp_sem).permute(2, 0, 1).float()
             # n = torch.tensor(n_sem_img).permute(2,0,1).float()
         return [q, k1, k2], index
 
@@ -732,15 +736,16 @@ class HabitatSemObjwiseEvalDataset(data.Dataset):
     def pull_image(self, index):
         scene = self.data_list[index].split("/")[-2]
         scene_idx = self.scenes.index(scene)
-        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[...,0:1]
+        x_sem = cv2.imread(self.data_list[index].replace("rgb", "sem"))[..., 0:1]
         semantic_img = Image.new(
             "P", (x_sem.shape[1], x_sem.shape[0])
         )
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
         semantic_img.putdata((x_sem.flatten() % 40).astype(np.uint8))
-        semantic_img = np.array(semantic_img.convert("RGBA"))[...,:3]/255.
-        q = torch.tensor(semantic_img).permute(2,0,1).float()
+        semantic_img = np.array(semantic_img.convert("RGBA"))[..., :3] / 255.
+        q = torch.tensor(semantic_img).permute(2, 0, 1).float()
         return q, index, scene_idx
+
 
 class AI2thorImageDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
@@ -770,34 +775,35 @@ class AI2thorImageDataset(data.Dataset):
         l_r = np.random.randint(8) * 45
         p = np.random.randint(9)
         if p == 0:
-            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x - 0.25), '%.2f' % (l_y-0.25), '%d' % l_r]) + "|0.png")
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x - 0.25), '%.2f' % (l_y - 0.25), '%d' % l_r]) + "|0.png")
         elif p == 1:
             x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x - 0.25), '%.2f' % l_y, '%d' % l_r]) + "|0.png")
         elif p == 2:
-            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x - 0.25), '%.2f' % (l_y+0.25), '%d' % l_r]) + "|0.png")
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x - 0.25), '%.2f' % (l_y + 0.25), '%d' % l_r]) + "|0.png")
         elif p == 3:
-            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x), '%.2f' % (l_y-0.25), '%d' % l_r]) + "|0.png")
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x), '%.2f' % (l_y - 0.25), '%d' % l_r]) + "|0.png")
         elif p == 4:
             x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x), '%.2f' % (l_y), '%d' % l_r]) + "|0.png")
         elif p == 5:
-            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x), '%.2f' % (l_y+0.25), '%d' % l_r]) + "|0.png")
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x), '%.2f' % (l_y + 0.25), '%d' % l_r]) + "|0.png")
         elif p == 6:
-            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x+0.25), '%.2f' % (l_y-0.25), '%d' % l_r]) + "|0.png")
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x + 0.25), '%.2f' % (l_y - 0.25), '%d' % l_r]) + "|0.png")
         elif p == 7:
-            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x+0.25), '%.2f' % (l_y), '%d' % l_r]) + "|0.png")
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x + 0.25), '%.2f' % (l_y), '%d' % l_r]) + "|0.png")
         elif p == 8:
-            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x+0.25), '%.2f' % (l_y+0.25), '%d' % l_r]) + "|0.png")
+            x_aug_data = os.path.join("/".join(self.data_list[index].split("/")[:-1]), "|".join(['%.2f' % (l_x + 0.25), '%.2f' % (l_y + 0.25), '%d' % l_r]) + "|0.png")
 
         if os.path.exists(x_aug_data):
             x_aug = plt.imread(x_aug_data)
         else:
             x_aug = self.augment(x)
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
-        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+        q = torch.tensor(x[..., :3]).permute(2, 0, 1)
+        k = torch.tensor(x_aug[..., :3]).permute(2, 0, 1)
         if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
-            k = torch.cat([k, torch.tensor(x_aug[...,-1:]).permute(2,0,1)], 0)
+            q = torch.cat([q, torch.tensor(x[..., -1:]).permute(2, 0, 1)], 0)
+            k = torch.cat([k, torch.tensor(x_aug[..., -1:]).permute(2, 0, 1)], 0)
         return [q, k], index
+
 
 class AI2thorImageEvalDataset(data.Dataset):
     def __init__(self, data_list, base_transform=None, noisydepth=False):
@@ -814,9 +820,9 @@ class AI2thorImageEvalDataset(data.Dataset):
     def pull_image(self, index):
         # scene = self.data_list[index].split("/")[-2]
         x = plt.imread(self.data_list[index])
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        q = torch.tensor(x[..., :3]).permute(2, 0, 1)
         if self.noisydepth:
-            q = torch.cat([q, torch.tensor(x[...,-1:]).permute(2,0,1)], 0)
+            q = torch.cat([q, torch.tensor(x[..., -1:]).permute(2, 0, 1)], 0)
         return q, index
 
 
@@ -840,12 +846,12 @@ class HabitatObjectEvalDataset(data.Dataset):
         return len(self.data_list)
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])[...,:3]
+        x = plt.imread(self.data_list[index])[..., :3]
 
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
+            q = self.base_transform(Image.fromarray((x * 255.).astype(np.uint8)))
         else:
-            q = torch.tensor(x).permute(2,0,1)
+            q = torch.tensor(x).permute(2, 0, 1)
 
         q_loc = joblib.load(self.data_list[index].replace('.png', '.dat.gz'))
         q_loc = torch.tensor([0] + list(q_loc['bbox']))
@@ -882,10 +888,14 @@ class HabitatObjectDataset(data.Dataset):
 
     def add_bbox_noise(self, input_object_t, noise_amount=20, input_height=0.5, input_width=0.5):
         input_object_noised_t = input_object_t.copy()
-        input_object_noised_t[:, 0] = np.maximum(input_object_noised_t[:, 0] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 0)
-        input_object_noised_t[:, 1] = np.maximum(input_object_noised_t[:, 1] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 0)
-        input_object_noised_t[:, 2] = np.minimum(input_object_noised_t[:, 2] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 1)
-        input_object_noised_t[:, 3] = np.minimum(input_object_noised_t[:, 3] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 1)
+        input_object_noised_t[:, 0] = np.maximum(
+            input_object_noised_t[:, 0] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 0)
+        input_object_noised_t[:, 1] = np.maximum(
+            input_object_noised_t[:, 1] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 0)
+        input_object_noised_t[:, 2] = np.minimum(
+            input_object_noised_t[:, 2] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 1)
+        input_object_noised_t[:, 3] = np.minimum(
+            input_object_noised_t[:, 3] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 1)
         return input_object_noised_t
 
     def reduce_half(self, input_object_t):
@@ -905,7 +915,7 @@ class HabitatObjectDataset(data.Dataset):
         return input_object_t
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])[...,:3]
+        x = plt.imread(self.data_list[index])[..., :3]
         same_obj_images = list(np.sort(glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.png'))))
         same_obj_images.remove(self.data_list[index])
 
@@ -927,20 +937,19 @@ class HabitatObjectDataset(data.Dataset):
         else:
             # same_obj_images = np.stack(same_obj_images)
             idx = np.random.randint(len(same_obj_images))
-            x_aug = plt.imread(same_obj_images[idx])[...,:3]
-            k_loc = joblib.load(same_obj_images[idx].replace(".png",".dat.gz"))
+            x_aug = plt.imread(same_obj_images[idx])[..., :3]
+            k_loc = joblib.load(same_obj_images[idx].replace(".png", ".dat.gz"))
             k_bbox = np.array(k_loc['bbox']).reshape(-1, 4)
             # rgb_test_b = self.draw_bbox(x_aug.copy(), k_bbox.copy(), [k_loc['bbox_category'].copy()])
             k_bbox = self.reduce_half(k_bbox)
             k_bbox = torch.tensor([0] + list(k_bbox[0]))
 
-
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
-            k = self.base_transform(Image.fromarray((x_aug*255.).astype(np.uint8)))
+            q = self.base_transform(Image.fromarray((x * 255.).astype(np.uint8)))
+            k = self.base_transform(Image.fromarray((x_aug * 255.).astype(np.uint8)))
         else:
-            q = torch.tensor(x).permute(2,0,1)
-            k = torch.tensor(x_aug).permute(2,0,1)
+            q = torch.tensor(x).permute(2, 0, 1)
+            k = torch.tensor(x_aug).permute(2, 0, 1)
         return [q, k], [q_bbox, k_bbox], index
 
     def draw_bbox(self, rgb: np.ndarray, bboxes: np.ndarray, bbox_categories) -> np.ndarray:
@@ -967,10 +976,14 @@ class AI2ThorObjectDataset(data.Dataset):
 
     def add_bbox_noise(self, input_object_t, noise_amount=20, input_height=0.5, input_width=0.5):
         input_object_noised_t = input_object_t.copy()
-        input_object_noised_t[:, 0] = np.maximum(input_object_noised_t[:, 0] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 0)
-        input_object_noised_t[:, 1] = np.maximum(input_object_noised_t[:, 1] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 0)
-        input_object_noised_t[:, 2] = np.minimum(input_object_noised_t[:, 2] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 1)
-        input_object_noised_t[:, 3] = np.minimum(input_object_noised_t[:, 3] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 1)
+        input_object_noised_t[:, 0] = np.maximum(
+            input_object_noised_t[:, 0] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 0)
+        input_object_noised_t[:, 1] = np.maximum(
+            input_object_noised_t[:, 1] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 0)
+        input_object_noised_t[:, 2] = np.minimum(
+            input_object_noised_t[:, 2] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_width / 100.), -noise_amount, noise_amount), 1)
+        input_object_noised_t[:, 3] = np.minimum(
+            input_object_noised_t[:, 3] + np.clip(np.random.standard_normal(input_object_t.shape[0]) * (noise_amount * input_height / 100.), -noise_amount, noise_amount), 1)
         return input_object_noised_t
 
     def reduce_half(self, input_object_t):
@@ -993,7 +1006,7 @@ class AI2ThorObjectDataset(data.Dataset):
         obj_cat = self.data_list[index].split("|")[5]
         obj_loc = np.stack([float(j) for j in np.stack(self.data_list[index].split("|")[6:9])])
         x = plt.imread(img_path)
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        q = torch.tensor(x[..., :3]).permute(2, 0, 1)
 
         q_loc = joblib.load(self.data_list[index])
         q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
@@ -1001,17 +1014,17 @@ class AI2ThorObjectDataset(data.Dataset):
 
         same_scene_obj = glob.glob(os.path.join("/".join(self.data_list[index].split("/")[:-1]), '*.dat.gz'))
         same_scene_obj_loc = np.stack([[float(j) for j in np.stack(i.split("|")[6:9])] for i in same_scene_obj])
-        dist = ((same_scene_obj_loc - obj_loc[None])**2).sum(-1)**0.5
+        dist = ((same_scene_obj_loc - obj_loc[None]) ** 2).sum(-1) ** 0.5
         category = np.array([i.split("|")[5] for i in same_scene_obj])
         same_objs = np.where((dist == 0) & (category == obj_cat))[0]
-        randi = random.randint(0, len(same_objs)-1)
+        randi = random.randint(0, len(same_objs) - 1)
         same_idx = same_objs[randi]
         k_loc = joblib.load(same_scene_obj[same_idx])
         k_bbox = np.array(k_loc['bboxes']).reshape(-1, 4)
         object_path = same_scene_obj[same_idx]
         same_img_path = "|".join(object_path.split("|")[:-7]).replace("objects", "image") + ".png"
         x_aug = plt.imread(same_img_path)
-        k = torch.tensor(x_aug[...,:3]).permute(2,0,1)
+        k = torch.tensor(x_aug[..., :3]).permute(2, 0, 1)
         k_bbox = self.reduce_half(k_bbox)
         k_bbox = self.add_bbox_noise(k_bbox, noise_amount=0.01, input_height=(k_bbox[:, 3] - k_bbox[:, 1]), input_width=(k_bbox[:, 2] - k_bbox[:, 0]))
         k_loc = torch.tensor([0] + list(k_bbox[0]))
@@ -1035,7 +1048,7 @@ class AI2ThorObjectEvalDataset(data.Dataset):
         # obj_cat = self.data_list[index].split("|")[5]
         # obj_loc = np.stack([float(j) for j in np.stack(self.data_list[index].split("|")[6:9])])
         x = plt.imread(img_path)
-        q = torch.tensor(x[...,:3]).permute(2,0,1)
+        q = torch.tensor(x[..., :3]).permute(2, 0, 1)
 
         q_loc = joblib.load(self.data_list[index])
         q_bbox = np.array(q_loc['bboxes']).reshape(-1, 4)
@@ -1059,7 +1072,7 @@ class HabitatRGBObjDataset(data.Dataset):
         self.max_object = 10
         hists = joblib.load("/".join(data_list[0].split("/")[:5]) + '/object_hists.dat.gz')
         self.hists = hists['hists']
-        for i, hist_path in enumerate( hists['data_path']):
+        for i, hist_path in enumerate(hists['data_path']):
             hists['data_path'][i] = os.path.join("/".join(data_list[0].split("/")[:-5]), "/".join(hist_path.split("/")[-5:]))
         self.hists_datapath = hists['data_path']
         self.num_camera = 12
@@ -1092,7 +1105,7 @@ class HabitatRGBObjDataset(data.Dataset):
         return len(self.data_list)
 
     def augment(self, rgb, obj):
-        patch_size = rgb.shape[1]//self.num_camera
+        patch_size = rgb.shape[1] // self.num_camera
         data_patches = np.stack([rgb[:, i * patch_size:(i + 1) * patch_size] for i in range(self.num_camera)])
         index_list = np.arange(0, self.num_camera).tolist()
         random_cut = np.random.randint(self.num_camera)
@@ -1103,12 +1116,12 @@ class HabitatRGBObjDataset(data.Dataset):
         width = float(rgb.shape[1])
         bboxes = obj['bboxes'].copy()
         for bbox in bboxes:
-            if bbox[0] < a/width:
-                bbox[0] += (width - a)/width
-                bbox[2] += (width - a)/width
+            if bbox[0] < a / width:
+                bbox[0] += (width - a) / width
+                bbox[2] += (width - a) / width
             else:
-                bbox[0] -= a/width
-                bbox[2] -= a/width
+                bbox[0] -= a / width
+                bbox[2] -= a / width
         obj['bboxes'] = bboxes
         # bboxes = obj['bboxes']
         # bbox_category = obj['bbox_categories']
@@ -1121,7 +1134,7 @@ class HabitatRGBObjDataset(data.Dataset):
         return rgb_roted, obj
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])[...,:3]
+        x = plt.imread(self.data_list[index])[..., :3]
         x_obj = joblib.load(self.data_list[index].replace('_rgb.png', '.dat.gz').replace('image', 'object'))
         x_obj_out = np.zeros((self.max_object, 4))
         x_obj_out[:, 2:] = 1.
@@ -1133,7 +1146,7 @@ class HabitatRGBObjDataset(data.Dataset):
         if self.objwise:
             data_ii = self.hists_datapath.index(self.data_list[index])
             hist = self.hists[data_ii]
-            similarity = -np.sum(hist[None] * np.log((hist[None] + 0.0001) / (self.hists + 0.0001)),-1)
+            similarity = -np.sum(hist[None] * np.log((hist[None] + 0.0001) / (self.hists + 0.0001)), -1)
             cands = np.argsort(-similarity)[:30]
             # cands = cands[abs(cands - data_ii)>10000]
             # if len(cands) == 0:
@@ -1147,7 +1160,7 @@ class HabitatRGBObjDataset(data.Dataset):
                 same_place_list.remove(self.data_list[index])
             idx = np.random.randint(len(same_place_list))
             sp_sample = same_place_list[idx]
-        sp = plt.imread(sp_sample)[...,:3]
+        sp = plt.imread(sp_sample)[..., :3]
         sp_obj = joblib.load(sp_sample.replace('_rgb.png', '.dat.gz'))
         sp_obj_out = np.zeros((self.max_object, 4))
         sp_obj_out[:, 2:] = 1.
@@ -1163,13 +1176,13 @@ class HabitatRGBObjDataset(data.Dataset):
         x_aug_obj_category_out[:len(x_aug_obj['bbox_categories'])] = x_aug_obj['bbox_categories'][:self.max_object]
 
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
-            k1 = self.base_transform(Image.fromarray((x_aug*255.).astype(np.uint8)))
-            k2 = self.base_transform(Image.fromarray((sp*255.).astype(np.uint8)))
+            q = self.base_transform(Image.fromarray((x * 255.).astype(np.uint8)))
+            k1 = self.base_transform(Image.fromarray((x_aug * 255.).astype(np.uint8)))
+            k2 = self.base_transform(Image.fromarray((sp * 255.).astype(np.uint8)))
         else:
-            q = torch.tensor(x).permute(2,0,1).float()
-            k1 = torch.tensor(x_aug).permute(2,0,1).float()
-            k2 = torch.tensor(sp).permute(2,0,1).float()
+            q = torch.tensor(x).permute(2, 0, 1).float()
+            k1 = torch.tensor(x_aug).permute(2, 0, 1).float()
+            k2 = torch.tensor(sp).permute(2, 0, 1).float()
         # query, same_place_rot, same_place
         return [q, k1, k2], [x_obj_out, x_aug_obj_out, sp_obj_out], [x_obj_category_out, x_aug_obj_category_out, sp_obj_category_out], index
 
@@ -1190,7 +1203,7 @@ class HabitatRGBObjEvalDataset(data.Dataset):
         return len(self.data_list)
 
     def pull_image(self, index):
-        x = plt.imread(self.data_list[index])[...,:3]
+        x = plt.imread(self.data_list[index])[..., :3]
         scene = self.data_list[index].split("/")[-2]
         # scene_idx = self.scenes.index(scene)
         x_obj = joblib.load(self.data_list[index].replace('_rgb.png', '.dat.gz').replace('image', 'object'))
@@ -1202,7 +1215,206 @@ class HabitatRGBObjEvalDataset(data.Dataset):
         x_obj_category_out[:len(x_obj['bbox_categories'])] = x_obj['bbox_categories'][:self.max_object]
 
         if self.base_transform is not None:
-            q = self.base_transform(Image.fromarray((x*255.).astype(np.uint8)))
+            q = self.base_transform(Image.fromarray((x * 255.).astype(np.uint8)))
         else:
-            q = torch.tensor(x).permute(2,0,1).float()
+            q = torch.tensor(x).permute(2, 0, 1).float()
         return q, x_obj_out, x_obj_category_out, index
+
+
+class ParkingImageDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, resize_factor=1):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        # self.resize_factor = 0.5
+        self.resize_factor = resize_factor
+        data_path = "/".join(self.data_list[0].split("/")[:-2])
+        loc_file_list = np.sort(os.listdir(os.path.join(data_path, "loc")))
+        file_list = np.sort(os.listdir(os.path.join(data_path, "img")))
+        file_time_list = np.stack([int(file_[:-4]) for file_ in loc_file_list])
+        self.data_locs = []
+        for i, file_path in enumerate(file_list):
+            file_name = int(file_path[:-4])
+            idx = np.argmin(abs(file_name - file_time_list))
+            location = np.loadtxt(os.path.join(data_path, "loc", loc_file_list[idx]))
+            self.data_locs.append(location)
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def augment(self, img):
+        img_size = int(img.shape[1] / 4)
+        data_patches = np.stack([img[:, i * img_size:(i + 1) * img_size] for i in range(4)])
+        index_list = np.arange(0, 4).tolist()
+        random_cut = np.random.randint(4)
+        index_list = index_list[random_cut:] + index_list[:random_cut]
+        permuted_patches = data_patches[index_list]
+        augmented_img = np.concatenate(np.split(permuted_patches, 4, axis=0), 2)[0]
+        return augmented_img
+
+    def correct_order(self, img):
+        img_size = int(img.shape[1] / 4)
+        data_patches = np.stack([img[:, i * img_size:(i + 1) * img_size] for i in range(4)])
+        permuted_patches = data_patches[[0, 2, 1, 3]]
+        img = np.concatenate(np.split(permuted_patches, 4, axis=0), 2)[0]
+        return img
+
+    def pull_image(self, index):
+        x = cv2.imread(self.data_list[index])
+        x = cv2.resize(x, (0, 0), fx=self.resize_factor, fy=self.resize_factor)
+        x = self.correct_order(x)
+        x_aug = self.augment(x)
+        curr_loc = self.data_locs[index]
+
+        dist = -1
+        while dist < 5:
+            neg_idx = np.random.randint(len(self.data_list))
+            neg_loc = self.data_locs[neg_idx]
+            dist = np.sqrt((curr_loc[0] - neg_loc[0]) ** 2 + (curr_loc[1] - neg_loc[1]) ** 2)
+
+        negative_sample = self.data_list[neg_idx]
+        n = cv2.imread(negative_sample)
+        n = cv2.resize(n, (0, 0), fx=self.resize_factor, fy=self.resize_factor)
+        n = self.correct_order(n)
+
+        if self.base_transform is not None:
+            q = self.base_transform(Image.fromarray((x[..., :3]).astype(np.uint8)))
+            k = self.base_transform(Image.fromarray((x_aug[..., :3]).astype(np.uint8)))
+            n = self.base_transform(Image.fromarray((n[..., :3]).astype(np.uint8)))
+        else:
+            q = torch.tensor(x[..., :3]).permute(2, 0, 1)
+            k = torch.tensor(x_aug[..., :3]).permute(2, 0, 1)
+            n = torch.tensor(n[..., :3]).permute(2, 0, 1)
+        return [q, k, n], index
+
+
+class ParkingImageEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, resize_factor=1):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.resize_factor = resize_factor
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def correct_order(self, img):
+        img_size = int(img.shape[1] / 4)
+        data_patches = np.stack([img[:, i * img_size:(i + 1) * img_size] for i in range(4)])
+        permuted_patches = data_patches[[0, 2, 1, 3]]
+        img = np.concatenate(np.split(permuted_patches, 4, axis=0), 2)[0]
+        return img
+
+    def pull_image(self, index):
+        x = cv2.imread(self.data_list[index])
+        x = cv2.resize(x, (0, 0), fx=self.resize_factor, fy=self.resize_factor)
+        x = self.correct_order(x)
+        if self.base_transform is not None:
+            q = self.base_transform(Image.fromarray((x[..., :3]).astype(np.uint8)))
+        else:
+            q = torch.tensor(x[..., :3]).permute(2, 0, 1)
+        return q, index
+
+
+
+class BEVImageDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, resize_factor=1):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        # self.resize_factor = 0.5
+        self.resize_factor = resize_factor
+        data_path = "/".join(self.data_list[0].split("/")[:-2])
+        loc_file_list = np.sort(os.listdir(os.path.join(data_path, "seg_gps")))
+        file_list = np.sort(os.listdir(os.path.join(data_path, "seg_image")))
+        file_time_list = np.stack([int(file_[:-4]) for file_ in loc_file_list])
+        self.data_locs = []
+        for i, file_path in enumerate(file_list):
+            file_name = int(file_path[:-4])
+            idx = np.argmin(abs(file_name - file_time_list))
+            location = np.loadtxt(os.path.join(data_path, "seg_gps", loc_file_list[idx]))
+            self.data_locs.append(location)
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def augment(self, img):
+        img_size = int(img.shape[1] / 4)
+        data_patches = np.stack([img[:, i * img_size:(i + 1) * img_size] for i in range(4)])
+        index_list = np.arange(0, 4).tolist()
+        random_cut = np.random.randint(4)
+        index_list = index_list[random_cut:] + index_list[:random_cut]
+        permuted_patches = data_patches[index_list]
+        augmented_img = np.concatenate(np.split(permuted_patches, 4, axis=0), 2)[0]
+        return augmented_img
+
+    def correct_order(self, img):
+        img_size = int(img.shape[1] / 4)
+        data_patches = np.stack([img[:, i * img_size:(i + 1) * img_size] for i in range(4)])
+        permuted_patches = data_patches[[0, 2, 1, 3]]
+        img = np.concatenate(np.split(permuted_patches, 4, axis=0), 2)[0]
+        return img
+
+    def pull_image(self, index):
+        x = cv2.imread(self.data_list[index])
+        x = cv2.resize(x, (0, 0), fx=self.resize_factor, fy=self.resize_factor)
+        x = self.correct_order(x)
+        x_aug = self.augment(x)
+        curr_loc = self.data_locs[index]
+
+        dist = -1
+        while dist < 5:
+            neg_idx = np.random.randint(len(self.data_list))
+            neg_loc = self.data_locs[neg_idx]
+            dist = np.sqrt((curr_loc[0] - neg_loc[0]) ** 2 + (curr_loc[1] - neg_loc[1]) ** 2)
+
+        negative_sample = self.data_list[neg_idx]
+        n = cv2.imread(negative_sample)
+        n = cv2.resize(n, (0, 0), fx=self.resize_factor, fy=self.resize_factor)
+        n = self.correct_order(n)
+
+        if self.base_transform is not None:
+            q = self.base_transform(Image.fromarray((x[..., :3]).astype(np.uint8)))
+            k = self.base_transform(Image.fromarray((x_aug[..., :3]).astype(np.uint8)))
+            n = self.base_transform(Image.fromarray((n[..., :3]).astype(np.uint8)))
+        else:
+            q = torch.tensor(x[..., :3]).permute(2, 0, 1)
+            k = torch.tensor(x_aug[..., :3]).permute(2, 0, 1)
+            n = torch.tensor(n[..., :3]).permute(2, 0, 1)
+        return [q, k, n], index
+
+
+class BEVImageEvalDataset(data.Dataset):
+    def __init__(self, data_list, base_transform=None, resize_factor=1):
+        self.data_list = data_list
+        self.base_transform = base_transform
+        self.resize_factor = resize_factor
+
+    def __getitem__(self, index):
+        return self.pull_image(index)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def correct_order(self, img):
+        img_size = int(img.shape[1] / 4)
+        data_patches = np.stack([img[:, i * img_size:(i + 1) * img_size] for i in range(4)])
+        permuted_patches = data_patches[[0, 2, 1, 3]]
+        img = np.concatenate(np.split(permuted_patches, 4, axis=0), 2)[0]
+        return img
+
+    def pull_image(self, index):
+        x = cv2.imread(self.data_list[index])
+        x = cv2.resize(x, (0, 0), fx=self.resize_factor, fy=self.resize_factor)
+        x = self.correct_order(x)
+        if self.base_transform is not None:
+            q = self.base_transform(Image.fromarray((x[..., :3]).astype(np.uint8)))
+        else:
+            q = torch.tensor(x[..., :3]).permute(2, 0, 1)
+        return q, index
